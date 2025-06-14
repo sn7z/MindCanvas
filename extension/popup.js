@@ -71,7 +71,7 @@ async function handleExportClick() {
  * Handle dashboard button click
  */
 function handleDashboardClick() {
-    chrome.tabs.create({ url: 'http://localhost:8001/static/index.html' });
+    chrome.tabs.create({ url: 'http://localhost:8090/static/index.html' });
 }
 
 /**
@@ -117,7 +117,7 @@ function sendMessageToBackground(message) {
  */
 async function checkBackendStatus() {
     try {
-        const response = await fetch('http://localhost:8001/', {
+        const response = await fetch('http://localhost:8090/', {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });

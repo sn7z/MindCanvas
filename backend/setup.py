@@ -86,7 +86,7 @@ def setup_database():
         
         print("✅ Database setup complete")
         print("🚀 You can now run: python main.py")
-        print("🌐 Dashboard will be at: http://localhost:8001/static/index.html")
+        print("🌐 Dashboard will be at: http://localhost:8090/static/index.html")
         
         return True
         

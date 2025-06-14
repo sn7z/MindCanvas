@@ -6,3 +6,4 @@ crawl4ai
 sentence-transformers
 groq
 openai
+supabase

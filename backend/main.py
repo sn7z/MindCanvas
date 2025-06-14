@@ -53,17 +53,10 @@ app.add_middleware(
 )
 
 # Serve static files
-import os
-static_dir = os.path.join(os.path.dirname(__file__), "static")
-if not os.path.exists(static_dir):
-    os.makedirs(static_dir)
-    logger.info(f"Created static directory: {static_dir}")
-
 try:
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
-    logger.info(f"Serving static files from: {static_dir}")
-except Exception as e:
-    logger.error(f"Failed to mount static files: {e}")
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+except:
+    logger.warning("Static directory not found")
 
 # Global database
 db: SimpleVectorDB = None
@@ -675,4 +668,4 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
     # Use different port if 8000 is blocked
-    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8090, reload=True)

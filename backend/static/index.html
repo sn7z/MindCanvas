@@ -1,491 +1,846 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MindCanvas - AI Knowledge Dashboard</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MindCanvas - AI Knowledge Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #333;
-            min-height: 100vh;
-            padding: 20px;
-        }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #333;
+      min-height: 100vh;
+      padding: 20px;
+    }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
 
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 30px;
-            color: white;
-        }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 30px;
+      color: white;
+    }
 
-        .header h1 {
-            font-size: 3rem;
-            margin-bottom: 10px;
-            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
+    .header h1 {
+      font-size: 3rem;
+      margin-bottom: 10px;
+      background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
 
-        .controls {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
-        }
+    .header .subtitle {
+      font-size: 1.2rem;
+      opacity: 0.9;
+      margin-bottom: 10px;
+    }
 
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 25px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
+    .features {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 15px;
+    }
 
-        .btn-primary {
-            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
-            color: white;
-            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
-        }
+    .feature-tag {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
 
-        .btn-secondary {
-            background: linear-gradient(45deg, #4ecdc4, #44a08d);
-            color: white;
-            box-shadow: 0 4px 15px rgba(78, 205, 196, 0.4);
-        }
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 30px;
+    }
 
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-        }
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 25px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
 
-        .stats-panel {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 30px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-        }
+    .btn-primary {
+      background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+      color: white;
+      box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+    }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
+    .btn-secondary {
+      background: linear-gradient(45deg, #4ecdc4, #44a08d);
+      color: white;
+      box-shadow: 0 4px 15px rgba(78, 205, 196, 0.4);
+    }
 
-        .stat-card {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
+    .btn-accent {
+      background: linear-gradient(45deg, #9b59b6, #8e44ad);
+      color: white;
+      box-shadow: 0 4px 15px rgba(155, 89, 182, 0.4);
+    }
 
-        .stat-number {
-            font-size: 2rem;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
 
-        .stat-label {
-            font-size: 0.9rem;
-            opacity: 0.9;
-        }
+    .btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+    }
 
-        .search-section {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-        }
+    .stats-panel {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      padding: 20px;
+      margin-bottom: 30px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
 
-        .search-container {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
 
-        .search-box {
-            flex: 1;
-            padding: 12px 20px;
-            border: 2px solid #ddd;
-            border-radius: 25px;
-            font-size: 16px;
-            outline: none;
-        }
+    .stat-card {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
 
-        .search-box:focus {
-            border-color: #667eea;
-        }
+    .stat-number {
+      font-size: 2rem;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
 
-        .content-panel {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            padding: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-        }
+    .stat-label {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
 
-        .content-list {
-            max-height: 600px;
-            overflow-y: auto;
-        }
+    .search-section {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
 
-        .content-item {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 10px;
-            transition: transform 0.2s ease;
-        }
+    .search-container {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
 
-        .content-item:hover {
-            transform: translateX(5px);
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
+    .search-box {
+      flex: 1;
+      padding: 12px 20px;
+      border: 2px solid #ddd;
+      border-radius: 25px;
+      font-size: 16px;
+      outline: none;
+    }
 
-        .content-title {
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 5px;
-            font-size: 1.1rem;
-        }
+    .search-box:focus {
+      border-color: #667eea;
+    }
 
-        .content-description {
-            color: #666;
-            font-size: 0.9rem;
-            line-height: 1.4;
-            margin-bottom: 8px;
-        }
+    .search-type {
+      padding: 12px 20px;
+      border: 2px solid #ddd;
+      border-radius: 25px;
+      background: white;
+      cursor: pointer;
+    }
 
-        .content-meta {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
+    .content-panel {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
 
-        .content-type {
-            background: #007bff;
-            color: white;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 0.8rem;
-        }
+    .content-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #eee;
+    }
 
-        .quality-score {
-            background: #28a745;
-            color: white;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 0.8rem;
-        }
+    .tab {
+      padding: 10px 20px;
+      border: none;
+      background: none;
+      font-size: 16px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.3s ease;
+    }
 
-        .loading {
-            text-align: center;
-            padding: 40px;
-            font-size: 1.2rem;
-            color: #666;
-        }
+    .tab.active {
+      border-bottom-color: #667eea;
+      color: #667eea;
+      font-weight: bold;
+    }
 
-        .error {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;
-        }
+    .content-list {
+      max-height: 600px;
+      overflow-y: auto;
+    }
 
-        .success {
-            background: #d4edda;
-            color: #155724;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 10px 0;
-        }
-    </style>
+    .content-item {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 10px;
+      transition: transform 0.2s ease;
+    }
+
+    .content-item:hover {
+      transform: translateX(5px);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .content-title {
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 5px;
+      font-size: 1.1rem;
+    }
+
+    .content-description {
+      color: #666;
+      font-size: 0.9rem;
+      line-height: 1.4;
+      margin-bottom: 8px;
+    }
+
+    .content-meta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .content-type {
+      background: #007bff;
+      color: white;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+    }
+
+    .quality-score {
+      background: #28a745;
+      color: white;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+    }
+
+    .similarity-score {
+      background: #ffc107;
+      color: #333;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+    }
+
+    .content-keywords {
+      font-size: 0.8rem;
+      color: #28a745;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      font-size: 1.2rem;
+      color: #666;
+    }
+
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+
+    .success {
+      background: #d4edda;
+      color: #155724;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .cluster-item {
+      background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+      border-left: 4px solid #2196f3;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+    }
+
+    .cluster-name {
+      font-weight: bold;
+      color: #1976d2;
+      margin-bottom: 5px;
+    }
+
+    .cluster-stats {
+      font-size: 0.9rem;
+      color: #666;
+      margin-bottom: 10px;
+    }
+
+    .trending-topic {
+      display: inline-block;
+      background: linear-gradient(45deg, #ff9800, #f57c00);
+      color: white;
+      padding: 8px 15px;
+      margin: 5px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: bold;
+    }
+  </style>
 </head>
+
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🧠 MindCanvas</h1>
-            <p>AI-Powered Knowledge Graph Platform</p>
-        </div>
-
-        <div class="controls">
-            <button class="btn btn-primary" onclick="refreshData()">
-                🔄 Refresh Data
-            </button>
-            <button class="btn btn-secondary" onclick="showAnalytics()">
-                📊 Analytics
-            </button>
-            <button class="btn btn-secondary" onclick="exportData()">
-                💾 Export Data
-            </button>
-        </div>
-
-        <div class="stats-panel">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-number" id="total-content">0</div>
-                    <div class="stat-label">Total Content</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="avg-quality">0</div>
-                    <div class="stat-label">Avg Quality</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="content-types">0</div>
-                    <div class="stat-label">Content Types</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="vector-enabled">✅</div>
-                    <div class="stat-label">Vector Search</div>
-                </div>
-            </div>
-            
-            <div id="status-message" class="success">
-                Ready! Use Chrome extension to export history, then refresh data.
-            </div>
-        </div>
-
-        <div class="search-section">
-            <h3>🔍 Semantic Search</h3>
-            <div class="search-container">
-                <input type="text" class="search-box" id="search-input" 
-                       placeholder="Search your knowledge (e.g., 'python tutorials', 'machine learning')">
-                <button class="btn btn-primary" onclick="performSearch()">Search</button>
-            </div>
-            <div id="search-results"></div>
-        </div>
-
-        <div class="content-panel">
-            <h3>📚 Your Knowledge Base</h3>
-            <div class="content-list" id="content-list">
-                <div class="loading">No content yet. Use the Chrome extension to export your browsing history.</div>
-            </div>
-        </div>
+  <div class="container">
+    <div class="header">
+      <h1>🧠 MindCanvas</h1>
+      <div class="subtitle">AI-Powered Knowledge Graph Platform</div>
+      <div class="features">
+        <span class="feature-tag">🔍 Vector Search</span>
+        <span class="feature-tag">🎯 Smart Clustering</span>
+        <span class="feature-tag">📊 Learning Analytics</span>
+        <span class="feature-tag">🤖 Dual LLM Processing</span>
+      </div>
     </div>
 
-    <script>
-        let allContent = [];
+    <div class="controls">
+      <button class="btn btn-primary" onclick="refreshData()">
+        🔄 Refresh Data
+      </button>
+      <button class="btn btn-secondary" onclick="clusterContent()">
+        🎯 Cluster Content
+      </button>
+      <button class="btn btn-accent" onclick="showAnalytics()">
+        📊 Analytics
+      </button>
+      <button class="btn btn-secondary" onclick="exportData()">
+        💾 Export Data
+      </button>
+    </div>
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            loadStats();
-            loadContent();
+    <div class="stats-panel">
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card">
+          <div class="stat-number" id="total-content">0</div>
+          <div class="stat-label">Total Content</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="vector-enabled">0</div>
+          <div class="stat-label">Vector Enabled</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="content-clusters">0</div>
+          <div class="stat-label">Content Clusters</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="avg-quality">0</div>
+          <div class="stat-label">Avg Quality</div>
+        </div>
+      </div>
+
+      <div id="status-message" class="loading">
+        Ready to explore your knowledge...
+      </div>
+    </div>
+
+    <div class="search-section">
+      <h3>🔍 Intelligent Search</h3>
+      <div class="search-container">
+        <input type="text" class="search-box" id="search-input"
+          placeholder="Search your knowledge (e.g., 'machine learning tutorials')">
+        <select class="search-type" id="search-type">
+          <option value="semantic">🧠 Semantic Search</option>
+          <option value="text">📝 Text Search</option>
+        </select>
+        <button class="btn btn-primary" onclick="performSearch()">Search</button>
+      </div>
+      <div id="search-results"></div>
+    </div>
+
+    <div class="content-panel">
+      <div class="content-tabs">
+        <button class="tab active" onclick="showTab('content')">📚 Content</button>
+        <button class="tab" onclick="showTab('clusters')">🎯 Clusters</button>
+        <button class="tab" onclick="showTab('trending')">🔥 Trending</button>
+        <button class="tab" onclick="showTab('recommendations')">💡 Recommendations</button>
+      </div>
+
+      <div id="content-tab" class="tab-content">
+        <div class="content-list" id="content-list">
+          <div class="loading">No content available. Use the Chrome extension to export history first.</div>
+        </div>
+      </div>
+
+      <div id="clusters-tab" class="tab-content hidden">
+        <div id="clusters-list">
+          <div class="loading">Click "Cluster Content" to generate content clusters.</div>
+        </div>
+      </div>
+
+      <div id="trending-tab" class="tab-content hidden">
+        <div id="trending-list">
+          <div class="loading">Loading trending topics...</div>
+        </div>
+      </div>
+
+      <div id="recommendations-tab" class="tab-content hidden">
+        <div id="recommendations-list">
+          <div class="loading">Loading recommendations...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Global variables
+    let allContent = [];
+    let currentTab = 'content';
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function () {
+      loadStats();
+      loadContent();
+      loadTrending();
+      loadRecommendations();
+    });
+
+    // API helper
+    async function apiCall(endpoint, options = {}) {
+      try {
+        const response = await fetch(`http://localhost:8090/api${endpoint}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...options.headers
+          },
+          ...options
         });
 
-        // API helper
-        async function apiCall(endpoint, options = {}) {
-            try {
-                const response = await fetch(`http://localhost:8001/api${endpoint}`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...options.headers
-                    },
-                    ...options
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`API Error: ${response.status}`);
-                }
-                
-                return await response.json();
-            } catch (error) {
-                console.error('API Call failed:', error);
-                showStatus(`Error: ${error.message}`, 'error');
-                throw error;
-            }
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.status}`);
         }
 
-        // Show status messages
-        function showStatus(message, type = 'info') {
-            const statusDiv = document.getElementById('status-message');
-            statusDiv.textContent = message;
-            statusDiv.className = type === 'error' ? 'error' : 
-                                 type === 'success' ? 'success' : 'loading';
+        return await response.json();
+      } catch (error) {
+        console.error('API Call failed:', error);
+        showStatus(`Error: ${error.message}`, 'error');
+        throw error;
+      }
+    }
+
+    // Show status messages
+    function showStatus(message, type = 'info') {
+      const statusDiv = document.getElementById('status-message');
+      statusDiv.textContent = message;
+      statusDiv.className = type === 'error' ? 'error' :
+        type === 'success' ? 'success' : 'loading';
+    }
+
+    // Update statistics
+    function updateStats(stats) {
+      document.getElementById('total-content').textContent = stats.total_content || 0;
+      document.getElementById('vector-enabled').textContent = stats.total_content || 0;
+      document.getElementById('content-clusters').textContent = Object.keys(stats.by_content_type || {}).length;
+
+      // Calculate average quality
+      const qualityDist = stats.quality_distribution || {};
+      let totalScore = 0;
+      let totalCount = 0;
+      for (const [score, count] of Object.entries(qualityDist)) {
+        totalScore += parseInt(score) * count;
+        totalCount += count;
+      }
+      const avgQuality = totalCount > 0 ? (totalScore / totalCount).toFixed(1) : 0;
+      document.getElementById('avg-quality').textContent = avgQuality;
+    }
+
+    // Load statistics
+    async function loadStats() {
+      try {
+        const stats = await apiCall('/stats');
+        updateStats(stats);
+        showStatus(`✅ Stats loaded - Database: ${stats.database || 'Supabase'}`, 'success');
+      } catch (error) {
+        console.error('Failed to load stats:', error);
+        showStatus('Failed to load statistics', 'error');
+      }
+    }
+
+    // Load content
+    async function loadContent() {
+      try {
+        showStatus('Loading content...', 'info');
+        const data = await apiCall('/content?limit=100');
+        allContent = data.content || [];
+
+        if (allContent.length === 0) {
+          showStatus('No content available. Use Chrome extension to export history first.', 'info');
+        } else {
+          showStatus(`✅ Loaded ${allContent.length} content items with vector embeddings`, 'success');
         }
 
-        // Load statistics
-        async function loadStats() {
-            try {
-                const stats = await apiCall('/stats');
-                document.getElementById('total-content').textContent = stats.total_content || 0;
-                document.getElementById('avg-quality').textContent = stats.average_quality || 0;
-                document.getElementById('content-types').textContent = Object.keys(stats.by_content_type || {}).length;
-                showStatus(`✅ Connected to database (${stats.total_content || 0} items)`, 'success');
-            } catch (error) {
-                showStatus('Failed to load stats - check if backend is running', 'error');
-            }
+        renderContentList();
+
+      } catch (error) {
+        showStatus('Failed to load content', 'error');
+      }
+    }
+
+    // Perform search
+    async function performSearch() {
+      const query = document.getElementById('search-input').value.trim();
+      const searchType = document.getElementById('search-type').value;
+
+      if (!query) {
+        showStatus('Please enter a search query', 'error');
+        return;
+      }
+
+      try {
+        showStatus(`🔍 Searching for "${query}"...`, 'info');
+
+        let results;
+        if (searchType === 'semantic') {
+          const response = await apiCall('/search/semantic', {
+            method: 'POST',
+            body: JSON.stringify({
+              query: query,
+              limit: 20,
+              min_similarity: 0.1
+            })
+          });
+          results = response.results || [];
+        } else {
+          const response = await apiCall(`/search?q=${encodeURIComponent(query)}&limit=20`);
+          results = response.results || [];
         }
 
-        // Load content
-        async function loadContent() {
-            try {
-                const data = await apiCall('/content?limit=50');
-                allContent = data.content || [];
-                renderContentList();
-            } catch (error) {
-                showStatus('Failed to load content', 'error');
-            }
-        }
+        showStatus(`Found ${results.length} results for "${query}"`, 'success');
+        renderSearchResults(results, query, searchType);
 
-        // Perform search
-        async function performSearch() {
-            const query = document.getElementById('search-input').value.trim();
-            
-            if (!query) {
-                showStatus('Please enter a search query', 'error');
-                return;
-            }
+      } catch (error) {
+        showStatus(`Search failed: ${error.message}`, 'error');
+      }
+    }
 
-            try {
-                showStatus(`🔍 Searching for "${query}"...`, 'info');
-                
-                const response = await apiCall('/search/semantic', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        query: query,
-                        limit: 20
-                    })
-                });
+    // Render search results
+    function renderSearchResults(results, query, searchType) {
+      const resultsDiv = document.getElementById('search-results');
 
-                const results = response.results || [];
-                showStatus(`Found ${results.length} results for "${query}"`, 'success');
-                renderSearchResults(results, query);
-                
-            } catch (error) {
-                showStatus(`Search failed: ${error.message}`, 'error');
-            }
-        }
+      if (results.length === 0) {
+        resultsDiv.innerHTML = '<div class="loading">No results found. Try a different search term.</div>';
+        return;
+      }
 
-        // Render search results
-        function renderSearchResults(results, query) {
-            const resultsDiv = document.getElementById('search-results');
-            
-            if (results.length === 0) {
-                resultsDiv.innerHTML = '<div class="loading">No results found. Try different keywords.</div>';
-                return;
-            }
-
-            resultsDiv.innerHTML = `
-                <h4>Search Results (${results.length})</h4>
+      resultsDiv.innerHTML = `
+                <h4>Search Results (${results.length}) - ${searchType === 'semantic' ? '🧠 Semantic' : '📝 Text'}</h4>
                 ${results.map(item => `
+                    <div class="content-item">
+                        <div class="content-title">${item.title || 'No Title'}</div>
+                        <div class="content-description">${item.description || item.summary || 'No description available'}</div>
+                        <div class="content-meta">
+                            <span class="content-type">${item.content_type || 'Unknown'}</span>
+                            <span class="quality-score">Quality: ${item.quality_score || 'N/A'}</span>
+                            ${item.similarity ? `<span class="similarity-score">Similarity: ${(item.similarity * 100).toFixed(1)}%</span>` : ''}
+                            <span class="content-keywords">
+                                Keywords: ${(item.key_details || item.key_topics || []).join(', ') || 'None'}
+                            </span>
+                            <a href="${item.url}" target="_blank" style="margin-left: auto;">🔗 Open</a>
+                        </div>
+                    </div>
+                `).join('')}
+            `;
+    }
+
+    // Cluster content
+    async function clusterContent() {
+      try {
+        showStatus('🎯 Clustering content by similarity...', 'info');
+
+        const response = await apiCall('/cluster', {
+          method: 'POST',
+          body: JSON.stringify({
+            min_cluster_size: 3
+          })
+        });
+
+        const clusters = response.clusters || [];
+        showStatus(`✅ Generated ${clusters.length} content clusters`, 'success');
+
+        renderClusters(clusters);
+        showTab('clusters');
+
+      } catch (error) {
+        showStatus(`Clustering failed: ${error.message}`, 'error');
+      }
+    }
+
+    // Render clusters
+    function renderClusters(clusters) {
+      const clustersDiv = document.getElementById('clusters-list');
+
+      if (clusters.length === 0) {
+        clustersDiv.innerHTML = '<div class="loading">No clusters generated. Need more content with similar topics.</div>';
+        return;
+      }
+
+      clustersDiv.innerHTML = clusters.map(cluster => `
+                <div class="cluster-item">
+                    <div class="cluster-name">${cluster.name}</div>
+                    <div class="cluster-stats">
+                        📊 ${cluster.content_count} items | 
+                        🎯 Cluster ID: ${cluster.id} |
+                        📈 Generated by vector similarity
+                    </div>
+                    <div>${cluster.description || 'Content cluster based on semantic similarity'}</div>
+                </div>
+            `).join('');
+    }
+
+    // Load trending topics
+    async function loadTrending() {
+      try {
+        const response = await apiCall('/trending?days=7&limit=15');
+        const trending = response.trending_topics || [];
+
+        renderTrending(trending);
+
+      } catch (error) {
+        console.error('Failed to load trending topics:', error);
+      }
+    }
+
+    // Render trending topics
+    function renderTrending(trending) {
+      const trendingDiv = document.getElementById('trending-list');
+
+      if (trending.length === 0) {
+        trendingDiv.innerHTML = '<div class="loading">No trending topics yet. Add more content to see trends.</div>';
+        return;
+      }
+
+      trendingDiv.innerHTML = `
+                <h4>🔥 Trending Topics (Last 7 days)</h4>
+                <div style="margin-top: 15px;">
+                    ${trending.map(topic => `
+                        <span class="trending-topic">
+                            ${topic.topic} (${topic.count})
+                        </span>
+                    `).join('')}
+                </div>
+                <div style="margin-top: 20px; font-size: 0.9rem; color: #666;">
+                    Topics ranked by frequency and content quality
+                </div>
+            `;
+    }
+
+    // Load recommendations
+    async function loadRecommendations() {
+      try {
+        const response = await apiCall('/recommendations?limit=10');
+        const recommendations = response.recommendations || [];
+
+        renderRecommendations(recommendations);
+
+      } catch (error) {
+        console.error('Failed to load recommendations:', error);
+      }
+    }
+
+    // Render recommendations
+    function renderRecommendations(recommendations) {
+      const recsDiv = document.getElementById('recommendations-list');
+
+      if (recommendations.length === 0) {
+        recsDiv.innerHTML = '<div class="loading">No recommendations yet. Add more content to get personalized suggestions.</div>';
+        return;
+      }
+
+      recsDiv.innerHTML = `
+                <h4>💡 Recommended for You</h4>
+                ${recommendations.map(item => `
                     <div class="content-item">
                         <div class="content-title">${item.title || 'No Title'}</div>
                         <div class="content-description">${item.summary || 'No description available'}</div>
                         <div class="content-meta">
                             <span class="content-type">${item.content_type || 'Unknown'}</span>
                             <span class="quality-score">Quality: ${item.quality_score || 'N/A'}</span>
-                            ${item.similarity ? `<span style="background: #ffc107; color: #333; padding: 3px 8px; border-radius: 12px; font-size: 0.8rem;">Similarity: ${(item.similarity * 100).toFixed(1)}%</span>` : ''}
                             <a href="${item.url}" target="_blank" style="margin-left: auto;">🔗 Open</a>
                         </div>
                     </div>
                 `).join('')}
             `;
-        }
+    }
 
-        // Show analytics
-        async function showAnalytics() {
-            try {
-                const analytics = await apiCall('/analytics');
-                alert(`Analytics:
+    // Show analytics
+    async function showAnalytics() {
+      try {
+        showStatus('📊 Loading analytics...', 'info');
+
+        const analytics = await apiCall('/analytics?days=30');
+        showStatus('✅ Analytics loaded', 'success');
+
+        // Simple analytics display
+        alert(`Learning Analytics (Last 30 days):
                 
-📚 Total Content: ${analytics.total_content || 0}
-⭐ Average Quality: ${analytics.average_quality || 0}
-🔧 Processing Methods: ${Object.keys(analytics.by_processing_method || {}).join(', ') || 'None'}
-📂 Content Types: ${Object.keys(analytics.by_content_type || {}).join(', ') || 'None'}
+📚 Content Stats:
+- Total Processed: ${analytics.content_stats?.total_processed || 0}
+- Average Quality: ${analytics.content_stats?.average_quality || 0}
+
+🔍 Search Patterns:
+- Total Searches: ${analytics.search_patterns?.total_searches || 0}
+- Unique Queries: ${analytics.search_patterns?.unique_queries || 0}
+
+📊 Learning Velocity:
+- Content per Day: ${analytics.learning_velocity?.content_per_day || 0}
+- Learning Streak: ${analytics.learning_velocity?.learning_streak || 0} days
+
+🎯 Knowledge Graph:
+- Total Relationships: ${analytics.knowledge_graph_stats?.total_relationships || 0}
+- Average Strength: ${analytics.knowledge_graph_stats?.average_strength || 0}
                 `);
-            } catch (error) {
-                showStatus(`Analytics failed: ${error.message}`, 'error');
-            }
-        }
 
-        // Refresh all data
-        async function refreshData() {
-            await loadStats();
-            await loadContent();
-        }
+      } catch (error) {
+        showStatus(`Analytics failed: ${error.message}`, 'error');
+      }
+    }
 
-        // Export data
-        async function exportData() {
-            try {
-                showStatus('💾 Exporting data...', 'info');
-                
-                const data = await apiCall('/knowledge-graph/export');
-                
-                const dataStr = JSON.stringify(data, null, 2);
-                const dataBlob = new Blob([dataStr], {type: 'application/json'});
-                const url = URL.createObjectURL(dataBlob);
-                
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `mindcanvas-export-${new Date().toISOString().split('T')[0]}.json`;
-                link.click();
-                
-                URL.revokeObjectURL(url);
-                showStatus('✅ Data exported successfully', 'success');
-                
-            } catch (error) {
-                showStatus(`Export failed: ${error.message}`, 'error');
-            }
-        }
+    // Refresh all data
+    async function refreshData() {
+      await loadStats();
+      await loadContent();
+      await loadTrending();
+      await loadRecommendations();
+    }
 
-        // Render content list
-        function renderContentList() {
-            const contentList = document.getElementById('content-list');
-            
-            if (allContent.length === 0) {
-                contentList.innerHTML = '<div class="loading">No content yet. Use the Chrome extension to export your browsing history.</div>';
-                return;
-            }
-            
-            contentList.innerHTML = allContent.map(item => `
+    // Export data
+    async function exportData() {
+      try {
+        showStatus('💾 Exporting knowledge graph...', 'info');
+
+        const graphData = await apiCall('/knowledge-graph/export?format_type=json');
+
+        const dataStr = JSON.stringify(graphData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `mindcanvas-knowledge-graph-${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+
+        URL.revokeObjectURL(url);
+        showStatus('✅ Knowledge graph exported successfully', 'success');
+
+      } catch (error) {
+        showStatus(`Export failed: ${error.message}`, 'error');
+      }
+    }
+
+    // Tab management
+    function showTab(tabName) {
+      // Update tab buttons
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      event.target.classList.add('active');
+
+      // Update tab content
+      document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.add('hidden');
+      });
+      document.getElementById(`${tabName}-tab`).classList.remove('hidden');
+
+      currentTab = tabName;
+    }
+
+    // Render content list
+    function renderContentList() {
+      const contentList = document.getElementById('content-list');
+
+      if (allContent.length === 0) {
+        contentList.innerHTML = '<div class="loading">No content available. Use Chrome extension to export history first.</div>';
+        return;
+      }
+
+      contentList.innerHTML = allContent.map(item => `
                 <div class="content-item">
                     <div class="content-title">${item.title || 'No Title'}</div>
                     <div class="content-description">${item.description || 'No description available'}</div>
                     <div class="content-meta">
                         <span class="content-type">${item.content_type || 'Unknown'}</span>
                         <span class="quality-score">Quality: ${item.quality_score || 'N/A'}</span>
+                        <span class="content-keywords">
+                            Keywords: ${(item.key_details || []).join(', ') || 'None'}
+                        </span>
                         <a href="${item.url}" target="_blank" style="margin-left: auto;">🔗 Open</a>
                     </div>
                 </div>
             `).join('');
-        }
+    }
 
-        // Search on Enter key
-        document.getElementById('search-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                performSearch();
-            }
-        });
+    // Search on Enter key
+    document.getElementById('search-input').addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') {
+        performSearch();
+      }
+    });
 
-        // Auto-refresh stats every 30 seconds
-        setInterval(loadStats, 30000);
-    </script>
+    // Auto-refresh stats every 30 seconds
+    setInterval(loadStats, 30000);
+  </script>
 </body>
+
 </html>

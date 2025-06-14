@@ -36,9 +36,9 @@ python setup.py
 python main.py
 ```
 
-Open: `http://localhost:8001/static/index.html`
+Open: `http://localhost:8090/static/index.html`
 
-**Note**: Using port 8001 to avoid Windows port conflicts.
+**Note**: Using port 8090 to avoid Windows port conflicts.
 
 ### 6. Install Chrome Extension
 
@@ -92,7 +92,7 @@ Uses Supabase (PostgreSQL + pgvector) for:
 
 **Extension not working?**
 
-- Make sure backend is running on port 8001
+- Make sure backend is running on port 8090
 - Check browser console for errors
 
 **Database errors?**
