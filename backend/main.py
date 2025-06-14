@@ -44,23 +44,6 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="MindCanvas", version="1.0")
 
-<<<<<<< HEAD
-# Add CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Serve static files
-try:
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-except:
-    logger.warning("Static directory not found")
-
-=======
->>>>>>> d982499ff5c84e78abc35ec5edd42fa7fbef50c2
 # Global database
 db: SimpleVectorDB = None
 
