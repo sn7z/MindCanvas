@@ -6,4 +6,10 @@ crawl4ai
 sentence-transformers
 groq
 openai
+<<<<<<< HEAD
 supabase
+=======
+supabase
+uvicorn
+fastapi
+>>>>>>> d982499ff5c84e78abc35ec5edd42fa7fbef50c2
