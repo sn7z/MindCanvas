@@ -9,3 +9,8 @@ openai
 supabase
 uvicorn
 fastapi
+
+pip install fastapi uvicorn supabase sentence-transformers
+pip install openai groq beautifulsoup4 httpx pydantic
+pip install numpy scikit-learn python-multipart
+pip install python-dotenv logging asyncio

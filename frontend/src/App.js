@@ -1,576 +1,604 @@
+// src/App.js - Full working version
 import React, { useState, useEffect } from 'react';
-import './App.css';
-import KnowledgeGraph from './KnowledgeGraph';
+import styled, { ThemeProvider, createGlobalStyle } from 'styled-components';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useKnowledgeStore } from './store/knowledgeStore';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { useGraphAnalytics } from './hooks/useGraphAnalytics';
+import PerformanceMonitor from './components/PerformanceMonitor';
 
-const API_BASE = 'http://localhost:8090/api';
+// Enhanced theme
+const theme = {
+  colors: {
+    primary: '#667eea',
+    secondary: '#764ba2',
+    accent: '#ff6b6b',
+    success: '#4ecdc4',
+    warning: '#f39c12',
+    error: '#e74c3c',
+    bg: 'linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%)',
+    surface: 'rgba(255, 255, 255, 0.05)',
+    surfaceHover: 'rgba(255, 255, 255, 0.1)',
+    text: '#ffffff',
+    textSecondary: 'rgba(255, 255, 255, 0.7)',
+    border: 'rgba(255, 255, 255, 0.1)',
+  },
+  spacing: {
+    xs: '4px',
+    sm: '8px',
+    md: '16px',
+    lg: '24px',
+    xl: '32px',
+    xxl: '48px'
+  },
+  borderRadius: {
+    sm: '8px',
+    md: '12px',
+    lg: '16px',
+    xl: '24px'
+  },
+  shadows: {
+    sm: '0 4px 15px rgba(0, 0, 0, 0.1)',
+    md: '0 8px 32px rgba(0, 0, 0, 0.15)',
+    lg: '0 16px 64px rgba(0, 0, 0, 0.2)',
+  }
+};
+
+const GlobalStyle = createGlobalStyle`
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  html, body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: ${props => props.theme.colors.bg};
+    color: ${props => props.theme.colors.text};
+    overflow: hidden;
+    height: 100%;
+  }
+  
+  #root {
+    height: 100vh;
+    width: 100vw;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+  }
+`;
+
+const AppContainer = styled.div`
+  height: 100vh;
+  width: 100vw;
+  display: grid;
+  grid-template-areas: 
+    "left-panel main-graph right-panel"
+    "chatbot chatbot chatbot";
+  grid-template-columns: 300px 1fr 300px;
+  grid-template-rows: 1fr 200px;
+  gap: ${props => props.theme.spacing.md};
+  padding: ${props => props.theme.spacing.md};
+  
+  @media (max-width: 1200px) {
+    grid-template-areas: 
+      "main-graph"
+      "chatbot";
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 250px;
+  }
+`;
+
+const Header = styled(motion.div)`
+  position: absolute;
+  top: ${props => props.theme.spacing.lg};
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  border-radius: ${props => props.theme.borderRadius.xl};
+  padding: ${props => props.theme.spacing.lg} ${props => props.theme.spacing.xl};
+  border: 1px solid ${props => props.theme.colors.border};
+  
+  h1 {
+    font-size: 2rem;
+    margin-bottom: ${props => props.theme.spacing.sm};
+    background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  
+  .subtitle {
+    font-size: 1rem;
+    opacity: 0.9;
+  }
+`;
+
+const MainGraphArea = styled(motion.div)`
+  grid-area: main-graph;
+  background: ${props => props.theme.colors.surface};
+  border-radius: ${props => props.theme.borderRadius.lg};
+  backdrop-filter: blur(20px);
+  border: 1px solid ${props => props.theme.colors.border};
+  overflow: hidden;
+  box-shadow: ${props => props.theme.shadows.lg};
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const SidePanel = styled(motion.div)`
+  display: flex;
+  flex-direction: column;
+  gap: ${props => props.theme.spacing.md};
+  
+  @media (max-width: 1200px) {
+    display: none;
+  }
+`;
+
+const PanelCard = styled(motion.div)`
+  background: ${props => props.theme.colors.surface};
+  border-radius: ${props => props.theme.borderRadius.lg};
+  backdrop-filter: blur(20px);
+  border: 1px solid ${props => props.theme.colors.border};
+  padding: ${props => props.theme.spacing.lg};
+  box-shadow: ${props => props.theme.shadows.md};
+  
+  h3 {
+    margin-bottom: ${props => props.theme.spacing.md};
+    color: ${props => props.theme.colors.text};
+    display: flex;
+    align-items: center;
+    gap: ${props => props.theme.spacing.sm};
+  }
+`;
+
+const ChatbotArea = styled(motion.div)`
+  grid-area: chatbot;
+  background: ${props => props.theme.colors.surface};
+  border-radius: ${props => props.theme.borderRadius.lg};
+  backdrop-filter: blur(20px);
+  border: 1px solid ${props => props.theme.colors.border};
+  box-shadow: ${props => props.theme.shadows.md};
+  padding: ${props => props.theme.spacing.lg};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const ControlsPanel = styled(motion.div)`
+  position: absolute;
+  top: ${props => props.theme.spacing.lg};
+  left: ${props => props.theme.spacing.lg};
+  z-index: 1000;
+  display: flex;
+  gap: ${props => props.theme.spacing.sm};
+`;
+
+const ControlButton = styled(motion.button)`
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: ${props => props.theme.colors.text};
+  padding: ${props => props.theme.spacing.md};
+  border-radius: ${props => props.theme.borderRadius.md};
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+    box-shadow: ${props => props.theme.shadows.md};
+  }
+`;
+
+const GraphVisualization = styled.div`
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: ${props => props.theme.colors.textSecondary};
+  
+  .graph-icon {
+    font-size: 4rem;
+    margin-bottom: ${props => props.theme.spacing.lg};
+    opacity: 0.6;
+  }
+  
+  .graph-title {
+    font-size: 1.5rem;
+    margin-bottom: ${props => props.theme.spacing.md};
+    color: ${props => props.theme.colors.text};
+  }
+  
+  .graph-description {
+    max-width: 400px;
+    line-height: 1.6;
+    margin-bottom: ${props => props.theme.spacing.lg};
+  }
+`;
+
+const StatusIndicator = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.sm};
+  margin-bottom: ${props => props.theme.spacing.md};
+  
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: ${props => props.connected ? props.theme.colors.success : props.theme.colors.error};
+    animation: ${props => props.connected ? 'pulse 2s infinite' : 'none'};
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+`;
+
+const Button = styled(motion.button)`
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border: none;
+  color: white;
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.lg};
+  border-radius: ${props => props.theme.borderRadius.md};
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: ${props => props.theme.shadows.md};
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+`;
+
+const LoadingOverlay = styled(motion.div)`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  color: white;
+  
+  .loader {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top: 3px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: ${props => props.theme.spacing.lg};
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
+const StatItem = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: ${props => props.theme.spacing.sm} 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  
+  &:last-child {
+    border-bottom: none;
+  }
+  
+  .label {
+    color: ${props => props.theme.colors.textSecondary};
+  }
+  
+  .value {
+    font-weight: 600;
+    color: ${props => props.theme.colors.success};
+  }
+`;
 
 const App = () => {
-  // State management
-  const [stats, setStats] = useState({
-    total_content: 0,
-    vector_enabled: 0,
-    content_clusters: 0,
-    avg_quality: 0
-  });
+  const [backendConnected, setBackendConnected] = useState(false);
+  const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(false);
+  const [currentView, setCurrentView] = useState('main');
   
-  const [allContent, setAllContent] = useState([]);
-  const [clusters, setClusters] = useState([]);
-  const [trending, setTrending] = useState([]);
-  const [recommendations, setRecommendations] = useState([]);
-  const [searchResults, setSearchResults] = useState([]);
-  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+  const {
+    graphData,
+    isLoading,
+    refreshAllData,
+    setLoading
+  } = useKnowledgeStore();
   
-  const [currentTab, setCurrentTab] = useState('content');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchType, setSearchType] = useState('semantic');
-  const [statusMessage, setStatusMessage] = useState('Ready to explore your knowledge...');
-  const [statusType, setStatusType] = useState('info');
-  const [isLoading, setIsLoading] = useState(false);
+  const analytics = useGraphAnalytics();
 
-  // API helper function
-  const apiCall = async (endpoint, options = {}) => {
-    try {
-      const response = await fetch(`${API_BASE}${endpoint}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers
-        },
-        ...options
-      });
-
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status}`);
+  // Keyboard shortcuts
+  useKeyboardShortcuts([
+    {
+      keys: 'ctrl+k',
+      action: () => console.log('Search shortcut pressed')
+    },
+    {
+      keys: 'ctrl+r',
+      action: (e) => {
+        e.preventDefault();
+        handleRefresh();
       }
-
-      return await response.json();
-    } catch (error) {
-      console.error('API Call failed:', error);
-      showStatus(`Error: ${error.message}`, 'error');
-      throw error;
+    },
+    {
+      keys: 'ctrl+shift+p',
+      action: () => setShowPerformanceMonitor(!showPerformanceMonitor)
     }
-  };
+  ]);
 
-  // Show status messages
-  const showStatus = (message, type = 'info') => {
-    setStatusMessage(message);
-    setStatusType(type);
-  };
-
-  // Load statistics
-  const loadStats = async () => {
-    try {
-      const statsData = await apiCall('/stats');
-      const updatedStats = {
-        total_content: statsData.total_content || 0,
-        vector_enabled: statsData.total_content || 0,
-        content_clusters: Object.keys(statsData.by_content_type || {}).length,
-        avg_quality: statsData.average_quality || 0
-      };
-      setStats(updatedStats);
-      showStatus(`✅ Stats loaded - Database: ${statsData.database || 'Supabase'}`, 'success');
-    } catch (error) {
-      console.error('Failed to load stats:', error);
-      showStatus('Failed to load statistics', 'error');
-    }
-  };
-
-  // Load content
-  const loadContent = async () => {
-    try {
-      setIsLoading(true);
-      showStatus('Loading content...', 'info');
-      const data = await apiCall('/content?limit=100');
-      const content = data.content || [];
-      setAllContent(content);
-
-      if (content.length === 0) {
-        showStatus('No content available. Use Chrome extension to export history first.', 'info');
-      } else {
-        showStatus(`✅ Loaded ${content.length} content items with vector embeddings`, 'success');
-      }
-    } catch (error) {
-      showStatus('Failed to load content', 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Load trending topics
-  const loadTrending = async () => {
-    try {
-      const response = await apiCall('/trending?days=7&limit=15');
-      setTrending(response.trending_topics || []);
-    } catch (error) {
-      console.error('Failed to load trending topics:', error);
-    }
-  };
-
-  // Load recommendations
-  const loadRecommendations = async () => {
-    try {
-      const response = await apiCall('/recommendations?limit=10');
-      setRecommendations(response.recommendations || []);
-    } catch (error) {
-      console.error('Failed to load recommendations:', error);
-    }
-  };
-
-  // Load knowledge graph data
-  const loadGraphData = async () => {
-    try {
-      const data = await apiCall('/knowledge-graph/export');
-      const nodes = (data.nodes || []).map(node => ({
-        id: node.id,
-        name: node.title,
-        type: node.content_type,
-        quality: node.quality_score,
-        topics: node.key_topics || [],
-        url: node.url
-      }));
-      
-      const links = (data.edges || []).map(edge => ({
-        source: edge.source,
-        target: edge.target,
-        shared_topics: edge.shared_topics || []
-      }));
-      
-      setGraphData({ nodes, links });
-    } catch (error) {
-      console.error('Failed to load graph data:', error);
-      // Create demo data if API fails
-      setGraphData({
-        nodes: [
-          { id: 1, name: 'React Tutorials', type: 'Tutorial', quality: 8 },
-          { id: 2, name: 'JavaScript Guide', type: 'Documentation', quality: 9 },
-          { id: 3, name: 'AI Research', type: 'Article', quality: 7 }
-        ],
-        links: [
-          { source: 1, target: 2 },
-          { source: 2, target: 3 }
-        ]
-      });
-    }
-  };
-
-  // Perform search
-  const performSearch = async () => {
-    if (!searchQuery.trim()) {
-      showStatus('Please enter a search query', 'error');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      showStatus(`🔍 Searching for "${searchQuery}"...`, 'info');
-
-      let results;
-      if (searchType === 'semantic') {
-        const response = await apiCall('/search/semantic', {
-          method: 'POST',
-          body: JSON.stringify({
-            query: searchQuery,
-            limit: 20,
-            min_similarity: 0.1
-          })
-        });
-        results = response.results || [];
-      } else {
-        const response = await apiCall(`/search?q=${encodeURIComponent(searchQuery)}&limit=20`);
-        results = response.results || [];
-      }
-
-      setSearchResults(results);
-      showStatus(`Found ${results.length} results for "${searchQuery}"`, 'success');
-    } catch (error) {
-      showStatus(`Search failed: ${error.message}`, 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Cluster content
-  const clusterContent = async () => {
-    try {
-      setIsLoading(true);
-      showStatus('🎯 Clustering content by similarity...', 'info');
-
-      const response = await apiCall('/cluster', {
-        method: 'POST',
-        body: JSON.stringify({
-          min_cluster_size: 3
-        })
-      });
-
-      const clustersData = response.clusters || [];
-      setClusters(clustersData);
-      showStatus(`✅ Generated ${clustersData.length} content clusters`, 'success');
-      setCurrentTab('clusters');
-    } catch (error) {
-      showStatus(`Clustering failed: ${error.message}`, 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Show analytics
-  const showAnalytics = async () => {
-    try {
-      setIsLoading(true);
-      showStatus('📊 Loading analytics...', 'info');
-
-      const analytics = await apiCall('/analytics?days=30');
-      showStatus('✅ Analytics loaded', 'success');
-
-      alert(`Learning Analytics (Last 30 days):
-                
-📚 Content Stats:
-- Total Processed: ${analytics.content_stats?.total_processed || 0}
-- Average Quality: ${analytics.content_stats?.average_quality || 0}
-
-🔍 Search Patterns:
-- Total Searches: ${analytics.search_patterns?.total_searches || 0}
-- Unique Queries: ${analytics.search_patterns?.unique_queries || 0}
-
-📊 Learning Velocity:
-- Content per Day: ${analytics.learning_velocity?.content_per_day || 0}
-- Learning Streak: ${analytics.learning_velocity?.learning_streak || 0} days
-
-🎯 Knowledge Graph:
-- Total Relationships: ${analytics.knowledge_graph_stats?.total_relationships || 0}
-- Average Strength: ${analytics.knowledge_graph_stats?.average_strength || 0}`);
-    } catch (error) {
-      showStatus(`Analytics failed: ${error.message}`, 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Export data
-  const exportData = async () => {
-    try {
-      setIsLoading(true);
-      showStatus('💾 Exporting knowledge graph...', 'info');
-
-      const graphData = await apiCall('/knowledge-graph/export?format_type=json');
-      const dataStr = JSON.stringify(graphData, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
-      const url = URL.createObjectURL(dataBlob);
-
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `mindcanvas-knowledge-graph-${new Date().toISOString().split('T')[0]}.json`;
-      link.click();
-
-      URL.revokeObjectURL(url);
-      showStatus('✅ Knowledge graph exported successfully', 'success');
-    } catch (error) {
-      showStatus(`Export failed: ${error.message}`, 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Refresh all data
-  const refreshData = async () => {
-    setIsLoading(true);
-    await Promise.all([
-      loadStats(),
-      loadContent(),
-      loadTrending(),
-      loadRecommendations(),
-      loadGraphData()
-    ]);
-    setIsLoading(false);
-  };
-
-  // Handle search on Enter key
-  const handleSearchKeyPress = (e) => {
-    if (e.key === 'Enter') {
-      performSearch();
-    }
-  };
-
-  // Tab switching
-  const showTab = (tabName) => {
-    setCurrentTab(tabName);
-  };
-
-  // Content item component
-  const ContentItem = ({ item, showSimilarity = false }) => (
-    <div className="content-item">
-      <div className="content-title">{item.title || 'No Title'}</div>
-      <div className="content-description">
-        {item.description || item.summary || 'No description available'}
-      </div>
-      <div className="content-meta">
-        <span className="content-type">{item.content_type || 'Unknown'}</span>
-        <span className="quality-score">Quality: {item.quality_score || 'N/A'}</span>
-        {showSimilarity && item.similarity && (
-          <span className="similarity-score">
-            Similarity: {(item.similarity * 100).toFixed(1)}%
-          </span>
-        )}
-        <span className="content-keywords">
-          Keywords: {(item.key_details || item.key_topics || []).join(', ') || 'None'}
-        </span>
-        <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 'auto' }}>
-          🔗 Open
-        </a>
-      </div>
-    </div>
-  );
-
-  // Initial load
+  // Check backend on mount
   useEffect(() => {
-    refreshData();
-    // Auto-refresh stats every 30 seconds
-    const interval = setInterval(loadStats, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    const checkBackend = async () => {
+      try {
+        const response = await fetch('http://localhost:8090/api/health');
+        setBackendConnected(response.ok);
+        if (response.ok) {
+          // Load initial data
+          await refreshAllData();
+        }
+      } catch (error) {
+        setBackendConnected(false);
+      }
+    };
+
+    checkBackend();
+  }, [refreshAllData]);
+
+  const handleRefresh = async () => {
+    setLoading(true);
+    try {
+      await refreshAllData();
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    }
+  };
+
+  const handleExportHistory = () => {
+    alert('Chrome extension feature - use the browser extension to export history');
+  };
 
   return (
-    <div className="container">
-      {/* Header */}
-      <div className="header">
-        <h1>🧠 MindCanvas</h1>
-        <div className="subtitle">AI-Powered Knowledge Graph Platform</div>
-        <div className="features">
-          <span className="feature-tag">🔍 Vector Search</span>
-          <span className="feature-tag">🎯 Smart Clustering</span>
-          <span className="feature-tag">📊 Learning Analytics</span>
-          <span className="feature-tag">🤖 Dual LLM Processing</span>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="controls">
-        <button 
-          className="btn btn-primary" 
-          onClick={refreshData}
-          disabled={isLoading}
+    <ThemeProvider theme={theme}>
+      <GlobalStyle />
+      <AppContainer>
+        {/* Header */}
+        <Header
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
         >
-          🔄 Refresh Data
-        </button>
-        <button 
-          className="btn btn-secondary" 
-          onClick={clusterContent}
-          disabled={isLoading}
+          <h1>🧠 MindCanvas</h1>
+          <div className="subtitle">AI-Powered Knowledge Graph</div>
+        </Header>
+
+        {/* Left Panel - Statistics */}
+        <SidePanel
+          initial={{ x: -300, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
         >
-          🎯 Cluster Content
-        </button>
-        <button 
-          className="btn btn-accent" 
-          onClick={showAnalytics}
-          disabled={isLoading}
+          <PanelCard>
+            <h3>📊 Overview</h3>
+            <StatusIndicator connected={backendConnected}>
+              <div className="status-dot" />
+              <span>{backendConnected ? 'Backend Connected' : 'Backend Offline'}</span>
+            </StatusIndicator>
+            
+            <StatItem>
+              <span className="label">Total Nodes:</span>
+              <span className="value">{analytics.nodeCount}</span>
+            </StatItem>
+            <StatItem>
+              <span className="label">Total Edges:</span>
+              <span className="value">{analytics.edgeCount}</span>
+            </StatItem>
+            <StatItem>
+              <span className="label">Avg Connections:</span>
+              <span className="value">{analytics.avgConnections}</span>
+            </StatItem>
+            <StatItem>
+              <span className="label">Clusters:</span>
+              <span className="value">{analytics.clusters.length}</span>
+            </StatItem>
+          </PanelCard>
+
+          <PanelCard>
+            <h3>🎯 Content Types</h3>
+            {analytics.clusters.map((cluster, index) => (
+              <StatItem key={index}>
+                <span className="label">{cluster.type}:</span>
+                <span className="value">{cluster.count}</span>
+              </StatItem>
+            ))}
+            {analytics.clusters.length === 0 && (
+              <div style={{ textAlign: 'center', opacity: 0.6 }}>
+                No content clusters yet
+              </div>
+            )}
+          </PanelCard>
+        </SidePanel>
+
+        {/* Main Graph Area */}
+        <MainGraphArea
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
         >
-          📊 Analytics
-        </button>
-        <button 
-          className="btn btn-secondary" 
-          onClick={exportData}
-          disabled={isLoading}
-        >
-          💾 Export Data
-        </button>
-      </div>
+          <ControlsPanel>
+            <ControlButton
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleRefresh}
+              disabled={isLoading}
+            >
+              {isLoading ? '🔄' : '↻'} Refresh
+            </ControlButton>
+            
+            <ControlButton
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleExportHistory}
+            >
+              📤 Export
+            </ControlButton>
+            
+            <ControlButton
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowPerformanceMonitor(!showPerformanceMonitor)}
+            >
+              📊 Performance
+            </ControlButton>
+          </ControlsPanel>
 
-      {/* Stats Panel */}
-      <div className="stats-panel">
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-number">{stats.total_content}</div>
-            <div className="stat-label">Total Content</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-number">{stats.vector_enabled}</div>
-            <div className="stat-label">Vector Enabled</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-number">{stats.content_clusters}</div>
-            <div className="stat-label">Content Clusters</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-number">{stats.avg_quality}</div>
-            <div className="stat-label">Avg Quality</div>
-          </div>
-        </div>
-
-        <div className={`status-message ${statusType}`}>
-          {statusMessage}
-        </div>
-      </div>
-
-      {/* Search Section */}
-      <div className="search-section">
-        <h3>🔍 Intelligent Search</h3>
-        <div className="search-container">
-          <input
-            type="text"
-            className="search-box"
-            placeholder="Search your knowledge (e.g., 'machine learning tutorials')"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={handleSearchKeyPress}
-          />
-          <select
-            className="search-type"
-            value={searchType}
-            onChange={(e) => setSearchType(e.target.value)}
-          >
-            <option value="semantic">🧠 Semantic Search</option>
-            <option value="text">📝 Text Search</option>
-          </select>
-          <button 
-            className="btn btn-primary" 
-            onClick={performSearch}
-            disabled={isLoading}
-          >
-            Search
-          </button>
-        </div>
-
-        {/* Search Results */}
-        {searchResults.length > 0 && (
-          <div className="search-results">
-            <h4>Search Results ({searchResults.length}) - {searchType === 'semantic' ? '🧠 Semantic' : '📝 Text'}</h4>
-            <div className="content-list">
-              {searchResults.map((item, index) => (
-                <ContentItem key={index} item={item} showSimilarity={searchType === 'semantic'} />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Content Panel */}
-      <div className="content-panel">
-        <div className="content-tabs">
-          <button 
-            className={`tab ${currentTab === 'content' ? 'active' : ''}`}
-            onClick={() => showTab('content')}
-          >
-            📚 Content
-          </button>
-          <button 
-            className={`tab ${currentTab === 'clusters' ? 'active' : ''}`}
-            onClick={() => showTab('clusters')}
-          >
-            🎯 Clusters
-          </button>
-          <button 
-            className={`tab ${currentTab === 'trending' ? 'active' : ''}`}
-            onClick={() => showTab('trending')}
-          >
-            🔥 Trending
-          </button>
-          <button 
-            className={`tab ${currentTab === 'recommendations' ? 'active' : ''}`}
-            onClick={() => showTab('recommendations')}
-          >
-            💡 Recommendations
-          </button>
-          <button 
-            className={`tab ${currentTab === 'graph' ? 'active' : ''}`}
-            onClick={() => showTab('graph')}
-          >
-            🌐 Knowledge Graph
-          </button>
-        </div>
-
-        {/* Content Tab */}
-        {currentTab === 'content' && (
-          <div className="tab-content">
-            <div className="content-list">
-              {isLoading ? (
-                <div className="loading">Loading content...</div>
-              ) : allContent.length === 0 ? (
-                <div className="loading">No content available. Use the Chrome extension to export history first.</div>
+          {/* Graph Visualization */}
+          <GraphVisualization>
+            <div className="graph-icon">🕸️</div>
+            <div className="graph-title">Interactive Knowledge Graph</div>
+            <div className="graph-description">
+              {backendConnected ? (
+                graphData.nodes.length > 0 ? (
+                  `Displaying ${graphData.nodes.length} knowledge nodes with ${graphData.links.length} connections. Use the Chrome extension to add more content to your graph.`
+                ) : (
+                  "Your knowledge graph is ready! Use the Chrome extension to export your browsing history and start building your personal knowledge network."
+                )
               ) : (
-                allContent.map((item, index) => (
-                  <ContentItem key={index} item={item} />
-                ))
+                "Backend server is not connected. Please start the backend server to begin using MindCanvas."
               )}
             </div>
-          </div>
-        )}
+            
+            {backendConnected && graphData.nodes.length === 0 && (
+              <Button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleExportHistory}
+              >
+                📱 Use Chrome Extension
+              </Button>
+            )}
+          </GraphVisualization>
 
-        {/* Clusters Tab */}
-        {currentTab === 'clusters' && (
-          <div className="tab-content">
-            <div className="clusters-list">
-              {clusters.length === 0 ? (
-                <div className="loading">Click "Cluster Content" to generate content clusters.</div>
-              ) : (
-                clusters.map((cluster, index) => (
-                  <div key={index} className="cluster-item">
-                    <div className="cluster-name">{cluster.name}</div>
-                    <div className="cluster-stats">
-                      📊 {cluster.content_count} items | 
-                      🎯 Cluster ID: {cluster.id} |
-                      📈 Generated by vector similarity
-                    </div>
-                    <div>{cluster.description || 'Content cluster based on semantic similarity'}</div>
-                  </div>
-                ))
-              )}
+          {/* Loading Overlay */}
+          <AnimatePresence>
+            {isLoading && (
+              <LoadingOverlay
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <div className="loader" />
+                <div>Loading your knowledge graph...</div>
+              </LoadingOverlay>
+            )}
+          </AnimatePresence>
+        </MainGraphArea>
+
+        {/* Right Panel - Recommendations */}
+        <SidePanel
+          initial={{ x: 300, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          <PanelCard>
+            <h3>💡 Quick Actions</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <Button
+                whileHover={{ scale: 1.02 }}
+                onClick={handleRefresh}
+                disabled={isLoading}
+              >
+                🔄 Refresh Data
+              </Button>
+              <Button
+                whileHover={{ scale: 1.02 }}
+                onClick={handleExportHistory}
+              >
+                📤 Export History
+              </Button>
+              <Button
+                whileHover={{ scale: 1.02 }}
+                onClick={() => window.open('http://localhost:8090/static/index.html', '_blank')}
+              >
+                🌐 Open Dashboard
+              </Button>
+            </div>
+          </PanelCard>
+
+          <PanelCard>
+            <h3>🔥 Recent Activity</h3>
+            <div style={{ textAlign: 'center', opacity: 0.6, padding: '20px 0' }}>
+              <div>📈</div>
+              <div style={{ marginTop: '8px' }}>
+                Activity will appear here as you use the system
+              </div>
+            </div>
+          </PanelCard>
+        </SidePanel>
+
+        {/* Chatbot Area */}
+        <ChatbotArea
+          initial={{ y: 200, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+        >
+          <div style={{ textAlign: 'center', opacity: 0.8 }}>
+            <div style={{ fontSize: '2rem', marginBottom: '16px' }}>🤖</div>
+            <div style={{ fontSize: '1.2rem', marginBottom: '8px' }}>AI Chatbot</div>
+            <div style={{ fontSize: '0.9rem', opacity: 0.7 }}>
+              {backendConnected ? 
+                'Chat functionality will be available once you have content in your knowledge graph' :
+                'Connect to backend to enable AI chat features'
+              }
             </div>
           </div>
-        )}
+        </ChatbotArea>
 
-        {/* Trending Tab */}
-        {currentTab === 'trending' && (
-          <div className="tab-content">
-            <div className="trending-list">
-              {trending.length === 0 ? (
-                <div className="loading">No trending topics yet. Add more content to see trends.</div>
-              ) : (
-                <>
-                  <h4>🔥 Trending Topics (Last 7 days)</h4>
-                  <div style={{ marginTop: '15px' }}>
-                    {trending.map((topic, index) => (
-                      <span key={index} className="trending-topic">
-                        {topic.topic} ({topic.count})
-                      </span>
-                    ))}
-                  </div>
-                  <div style={{ marginTop: '20px', fontSize: '0.9rem', color: '#666' }}>
-                    Topics ranked by frequency and content quality
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Recommendations Tab */}
-        {currentTab === 'recommendations' && (
-          <div className="tab-content">
-            <div className="recommendations-list">
-              {recommendations.length === 0 ? (
-                <div className="loading">No recommendations yet. Add more content to get personalized suggestions.</div>
-              ) : (
-                <>
-                  <h4>💡 Recommended for You</h4>
-                  {recommendations.map((item, index) => (
-                    <ContentItem key={index} item={item} />
-                  ))}
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Knowledge Graph Tab */}
-        {currentTab === 'graph' && (
-          <div className="tab-content">
-            <div className="graph-container">
-              <h4>🌐 Interactive Knowledge Graph</h4>
-              <KnowledgeGraph data={graphData} />
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+        {/* Performance Monitor */}
+        <PerformanceMonitor
+          isVisible={showPerformanceMonitor}
+          nodeCount={analytics.nodeCount}
+          edgeCount={analytics.edgeCount}
+        />
+      </AppContainer>
+    </ThemeProvider>
   );
 };
 
