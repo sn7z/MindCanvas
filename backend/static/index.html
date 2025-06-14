@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindCanvas - AI Knowledge Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+            box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            color: white;
+            box-shadow: 0 4px 15px rgba(78, 205, 196, 0.4);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .stats-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .search-section {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .search-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .search-box {
+            flex: 1;
+            padding: 12px 20px;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .search-box:focus {
+            border-color: #667eea;
+        }
+
+        .content-panel {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .content-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .content-item {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            transition: transform 0.2s ease;
+        }
+
+        .content-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .content-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 1.1rem;
+        }
+
+        .content-description {
+            color: #666;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            margin-bottom: 8px;
+        }
+
+        .content-meta {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .content-type {
+            background: #007bff;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+
+        .quality-score {
+            background: #28a745;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2rem;
+            color: #666;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 MindCanvas</h1>
+            <p>AI-Powered Knowledge Graph Platform</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-primary" onclick="refreshData()">
+                🔄 Refresh Data
+            </button>
+            <button class="btn btn-secondary" onclick="showAnalytics()">
+                📊 Analytics
+            </button>
+            <button class="btn btn-secondary" onclick="exportData()">
+                💾 Export Data
+            </button>
+        </div>
+
+        <div class="stats-panel">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="total-content">0</div>
+                    <div class="stat-label">Total Content</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="avg-quality">0</div>
+                    <div class="stat-label">Avg Quality</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="content-types">0</div>
+                    <div class="stat-label">Content Types</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="vector-enabled">✅</div>
+                    <div class="stat-label">Vector Search</div>
+                </div>
+            </div>
+            
+            <div id="status-message" class="success">
+                Ready! Use Chrome extension to export history, then refresh data.
+            </div>
+        </div>
+
+        <div class="search-section">
+            <h3>🔍 Semantic Search</h3>
+            <div class="search-container">
+                <input type="text" class="search-box" id="search-input" 
+                       placeholder="Search your knowledge (e.g., 'python tutorials', 'machine learning')">
+                <button class="btn btn-primary" onclick="performSearch()">Search</button>
+            </div>
+            <div id="search-results"></div>
+        </div>
+
+        <div class="content-panel">
+            <h3>📚 Your Knowledge Base</h3>
+            <div class="content-list" id="content-list">
+                <div class="loading">No content yet. Use the Chrome extension to export your browsing history.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allContent = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            loadContent();
+        });
+
+        // API helper
+        async function apiCall(endpoint, options = {}) {
+            try {
+                const response = await fetch(`http://localhost:8001/api${endpoint}`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API Call failed:', error);
+                showStatus(`Error: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        // Show status messages
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status-message');
+            statusDiv.textContent = message;
+            statusDiv.className = type === 'error' ? 'error' : 
+                                 type === 'success' ? 'success' : 'loading';
+        }
+
+        // Load statistics
+        async function loadStats() {
+            try {
+                const stats = await apiCall('/stats');
+                document.getElementById('total-content').textContent = stats.total_content || 0;
+                document.getElementById('avg-quality').textContent = stats.average_quality || 0;
+                document.getElementById('content-types').textContent = Object.keys(stats.by_content_type || {}).length;
+                showStatus(`✅ Connected to database (${stats.total_content || 0} items)`, 'success');
+            } catch (error) {
+                showStatus('Failed to load stats - check if backend is running', 'error');
+            }
+        }
+
+        // Load content
+        async function loadContent() {
+            try {
+                const data = await apiCall('/content?limit=50');
+                allContent = data.content || [];
+                renderContentList();
+            } catch (error) {
+                showStatus('Failed to load content', 'error');
+            }
+        }
+
+        // Perform search
+        async function performSearch() {
+            const query = document.getElementById('search-input').value.trim();
+            
+            if (!query) {
+                showStatus('Please enter a search query', 'error');
+                return;
+            }
+
+            try {
+                showStatus(`🔍 Searching for "${query}"...`, 'info');
+                
+                const response = await apiCall('/search/semantic', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        query: query,
+                        limit: 20
+                    })
+                });
+
+                const results = response.results || [];
+                showStatus(`Found ${results.length} results for "${query}"`, 'success');
+                renderSearchResults(results, query);
+                
+            } catch (error) {
+                showStatus(`Search failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Render search results
+        function renderSearchResults(results, query) {
+            const resultsDiv = document.getElementById('search-results');
+            
+            if (results.length === 0) {
+                resultsDiv.innerHTML = '<div class="loading">No results found. Try different keywords.</div>';
+                return;
+            }
+
+            resultsDiv.innerHTML = `
+                <h4>Search Results (${results.length})</h4>
+                ${results.map(item => `
+                    <div class="content-item">
+                        <div class="content-title">${item.title || 'No Title'}</div>
+                        <div class="content-description">${item.summary || 'No description available'}</div>
+                        <div class="content-meta">
+                            <span class="content-type">${item.content_type || 'Unknown'}</span>
+                            <span class="quality-score">Quality: ${item.quality_score || 'N/A'}</span>
+                            ${item.similarity ? `<span style="background: #ffc107; color: #333; padding: 3px 8px; border-radius: 12px; font-size: 0.8rem;">Similarity: ${(item.similarity * 100).toFixed(1)}%</span>` : ''}
+                            <a href="${item.url}" target="_blank" style="margin-left: auto;">🔗 Open</a>
+                        </div>
+                    </div>
+                `).join('')}
+            `;
+        }
+
+        // Show analytics
+        async function showAnalytics() {
+            try {
+                const analytics = await apiCall('/analytics');
+                alert(`Analytics:
+                
+📚 Total Content: ${analytics.total_content || 0}
+⭐ Average Quality: ${analytics.average_quality || 0}
+🔧 Processing Methods: ${Object.keys(analytics.by_processing_method || {}).join(', ') || 'None'}
+📂 Content Types: ${Object.keys(analytics.by_content_type || {}).join(', ') || 'None'}
+                `);
+            } catch (error) {
+                showStatus(`Analytics failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Refresh all data
+        async function refreshData() {
+            await loadStats();
+            await loadContent();
+        }
+
+        // Export data
+        async function exportData() {
+            try {
+                showStatus('💾 Exporting data...', 'info');
+                
+                const data = await apiCall('/knowledge-graph/export');
+                
+                const dataStr = JSON.stringify(data, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(dataBlob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `mindcanvas-export-${new Date().toISOString().split('T')[0]}.json`;
+                link.click();
+                
+                URL.revokeObjectURL(url);
+                showStatus('✅ Data exported successfully', 'success');
+                
+            } catch (error) {
+                showStatus(`Export failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Render content list
+        function renderContentList() {
+            const contentList = document.getElementById('content-list');
+            
+            if (allContent.length === 0) {
+                contentList.innerHTML = '<div class="loading">No content yet. Use the Chrome extension to export your browsing history.</div>';
+                return;
+            }
+            
+            contentList.innerHTML = allContent.map(item => `
+                <div class="content-item">
+                    <div class="content-title">${item.title || 'No Title'}</div>
+                    <div class="content-description">${item.description || 'No description available'}</div>
+                    <div class="content-meta">
+                        <span class="content-type">${item.content_type || 'Unknown'}</span>
+                        <span class="quality-score">Quality: ${item.quality_score || 'N/A'}</span>
+                        <a href="${item.url}" target="_blank" style="margin-left: auto;">🔗 Open</a>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Search on Enter key
+        document.getElementById('search-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        // Auto-refresh stats every 30 seconds
+        setInterval(loadStats, 30000);
+    </script>
+</body>
+</html>

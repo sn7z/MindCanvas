@@ -1,0 +1,50 @@
+# MindCanvas Enhanced - Supabase Vector Database Requirements
+
+# Core FastAPI and web framework
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+
+# HTTP clients and web scraping
+httpx
+aiohttp
+requests
+beautifulsoup4
+lxml
+
+# Database and Vector Storage
+supabase
+postgrest
+psycopg2-binary
+pgvector
+
+# AI and Machine Learning
+openai
+groq
+sentence-transformers
+transformers
+torch
+numpy
+scikit-learn
+
+# Data processing and utilities
+pandas
+python-dateutil
+python-dotenv
+tenacity
+pyjwt
+
+# Content extraction (optional - Crawl4AI)
+crawl4ai  # Uncomment if using Crawl4AI
+
+# Development and testing
+pytest
+pytest-asyncio
+black
+flake8==6.1.0
+
+
+# Additional utilities
+python-json-logger  # For structured logging
+asyncio-throttle  # For rate limiting

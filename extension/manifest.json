@@ -1,0 +1,15 @@
+{
+    "manifest_version": 3,
+    "name": "History Exporter",
+    "version": "1.0",
+    "description": "Exports browsing history to a backend API",
+    "permissions": ["history", "activeTab"],
+    "action": {
+      "default_popup": "popup.html"
+    },
+    "background": {
+      "service_worker": "background.js",
+      "type": "module"
+    },
+    "host_permissions": ["http://localhost:8001/*"]
+  }

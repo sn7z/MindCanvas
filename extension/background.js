@@ -1,7 +1,7 @@
 // Enhanced background script with better error handling and progress tracking
 
 const CONFIG = {
-    BACKEND_URL: 'http://localhost:8000',
+    BACKEND_URL: 'http://localhost:8001',
     MAX_RETRIES: 3,
     RETRY_DELAY: 1000,
     REQUEST_TIMEOUT: 30000,
@@ -171,7 +171,7 @@ function getErrorMessage(error) {
     }
     
     if (error.message.includes('Failed to fetch')) {
-        return 'Cannot connect to backend. Please ensure the server is running on port 8000.';
+        return 'Cannot connect to backend. Please ensure the server is running on port 8001.';
     }
     
     if (error.message.includes('HTTP 400')) {
