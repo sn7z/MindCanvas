@@ -6,3 +6,6 @@ crawl4ai
 sentence-transformers
 groq
 openai
+supabase
+uvicorn
+fastapi
