@@ -1,0 +1,8 @@
+httpx
+beautifulsoup4
+lxml
+numpy
+crawl4ai
+sentence-transformers
+groq
+openai
