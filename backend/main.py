@@ -419,18 +419,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Serve static files from the correct app instance
-import os
-static_dir = os.path.join(os.path.dirname(__file__), "static")
-if not os.path.exists(static_dir):
-    os.makedirs(static_dir) # This will create backend/static if it doesn't exist
-    logger.info(f"Created static directory: {static_dir}")
+# # Serve static files from the correct app instance
+# import os
+# static_dir = os.path.join(os.path.dirname(__file__), "static")
+# if not os.path.exists(static_dir):
+#     os.makedirs(static_dir) # This will create backend/static if it doesn't exist
+#     logger.info(f"Created static directory: {static_dir}")
 
-try:
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
-    logger.info(f"Serving static files from: {static_dir}")
-except Exception as e:
-    logger.error(f"Failed to mount static files: {e}")
+# try:
+#     app.mount("/static", StaticFiles(directory=static_dir), name="static")
+#     logger.info(f"Serving static files from: {static_dir}")
+# except Exception as e:
+#     logger.error(f"Failed to mount static files: {e}")
 
 # API Endpoints
 @app.post("/api/ingest")
