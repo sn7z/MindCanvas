@@ -1,13 +1,22 @@
-// src/App.js - Full working version
+// src/App.js - Complete implementation without ESLint errors
 import React, { useState, useEffect } from 'react';
 import styled, { ThemeProvider, createGlobalStyle } from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useKnowledgeStore } from './store/knowledgeStore';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useGraphAnalytics } from './hooks/useGraphAnalytics';
+
+// Import all the components
+import KnowledgeGraphViewer from './components/KnowledgeGraphViewer';
+import ChatbotPanel from './components/ChatbotPanel';
+import ControlPanel from './components/ControlPanel';
+import NodeDetailsModal from './components/NodeDetailsModal';
+import SearchOverlay from './components/SearchOverlay';
+import SettingsPanel from './components/SettingsPanel';
+import StatisticsPanel from './components/StatisticsPanel';
 import PerformanceMonitor from './components/PerformanceMonitor';
 
-// Enhanced theme
+// Enhanced theme with all necessary properties
 const theme = {
   colors: {
     primary: '#667eea',
@@ -41,6 +50,14 @@ const theme = {
     sm: '0 4px 15px rgba(0, 0, 0, 0.1)',
     md: '0 8px 32px rgba(0, 0, 0, 0.15)',
     lg: '0 16px 64px rgba(0, 0, 0, 0.2)',
+  },
+  animations: {
+    fast: '0.15s ease',
+    normal: '0.3s ease',
+    slow: '0.5s ease'
+  },
+  fonts: {
+    primary: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
   }
 };
 
@@ -52,7 +69,7 @@ const GlobalStyle = createGlobalStyle`
   }
   
   html, body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: ${props => props.theme.fonts.primary};
     background: ${props => props.theme.colors.bg};
     color: ${props => props.theme.colors.text};
     overflow: hidden;
@@ -85,8 +102,8 @@ const AppContainer = styled.div`
   grid-template-areas: 
     "left-panel main-graph right-panel"
     "chatbot chatbot chatbot";
-  grid-template-columns: 300px 1fr 300px;
-  grid-template-rows: 1fr 200px;
+  grid-template-columns: 320px 1fr 320px;
+  grid-template-rows: 1fr 220px;
   gap: ${props => props.theme.spacing.md};
   padding: ${props => props.theme.spacing.md};
   
@@ -137,8 +154,7 @@ const MainGraphArea = styled(motion.div)`
   box-shadow: ${props => props.theme.shadows.lg};
   position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
 `;
 
 const SidePanel = styled(motion.div)`
@@ -151,23 +167,6 @@ const SidePanel = styled(motion.div)`
   }
 `;
 
-const PanelCard = styled(motion.div)`
-  background: ${props => props.theme.colors.surface};
-  border-radius: ${props => props.theme.borderRadius.lg};
-  backdrop-filter: blur(20px);
-  border: 1px solid ${props => props.theme.colors.border};
-  padding: ${props => props.theme.spacing.lg};
-  box-shadow: ${props => props.theme.shadows.md};
-  
-  h3 {
-    margin-bottom: ${props => props.theme.spacing.md};
-    color: ${props => props.theme.colors.text};
-    display: flex;
-    align-items: center;
-    gap: ${props => props.theme.spacing.sm};
-  }
-`;
-
 const ChatbotArea = styled(motion.div)`
   grid-area: chatbot;
   background: ${props => props.theme.colors.surface};
@@ -175,10 +174,7 @@ const ChatbotArea = styled(motion.div)`
   backdrop-filter: blur(20px);
   border: 1px solid ${props => props.theme.colors.border};
   box-shadow: ${props => props.theme.shadows.md};
-  padding: ${props => props.theme.spacing.lg};
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow: hidden;
 `;
 
 const ControlsPanel = styled(motion.div)`
@@ -186,97 +182,6 @@ const ControlsPanel = styled(motion.div)`
   top: ${props => props.theme.spacing.lg};
   left: ${props => props.theme.spacing.lg};
   z-index: 1000;
-  display: flex;
-  gap: ${props => props.theme.spacing.sm};
-`;
-
-const ControlButton = styled(motion.button)`
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: ${props => props.theme.colors.text};
-  padding: ${props => props.theme.spacing.md};
-  border-radius: ${props => props.theme.borderRadius.md};
-  cursor: pointer;
-  font-size: 1rem;
-  transition: all 0.3s ease;
-  
-  &:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: translateY(-2px);
-    box-shadow: ${props => props.theme.shadows.md};
-  }
-`;
-
-const GraphVisualization = styled.div`
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: ${props => props.theme.colors.textSecondary};
-  
-  .graph-icon {
-    font-size: 4rem;
-    margin-bottom: ${props => props.theme.spacing.lg};
-    opacity: 0.6;
-  }
-  
-  .graph-title {
-    font-size: 1.5rem;
-    margin-bottom: ${props => props.theme.spacing.md};
-    color: ${props => props.theme.colors.text};
-  }
-  
-  .graph-description {
-    max-width: 400px;
-    line-height: 1.6;
-    margin-bottom: ${props => props.theme.spacing.lg};
-  }
-`;
-
-const StatusIndicator = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.sm};
-  margin-bottom: ${props => props.theme.spacing.md};
-  
-  .status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: ${props => props.connected ? props.theme.colors.success : props.theme.colors.error};
-    animation: ${props => props.connected ? 'pulse 2s infinite' : 'none'};
-  }
-  
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
-`;
-
-const Button = styled(motion.button)`
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  border: none;
-  color: white;
-  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.lg};
-  border-radius: ${props => props.theme.borderRadius.md};
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 600;
-  
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: ${props => props.theme.shadows.md};
-  }
-  
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-  }
 `;
 
 const LoadingOverlay = styled(motion.div)`
@@ -310,37 +215,188 @@ const LoadingOverlay = styled(motion.div)`
   }
 `;
 
-const StatItem = styled.div`
+const EmptyGraphState = styled.div`
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  padding: ${props => props.theme.spacing.sm} 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  color: ${props => props.theme.colors.textSecondary};
+  padding: ${props => props.theme.spacing.xl};
   
-  &:last-child {
-    border-bottom: none;
+  .icon {
+    font-size: 4rem;
+    margin-bottom: ${props => props.theme.spacing.lg};
+    opacity: 0.6;
   }
   
-  .label {
-    color: ${props => props.theme.colors.textSecondary};
+  .title {
+    font-size: 1.5rem;
+    margin-bottom: ${props => props.theme.spacing.md};
+    color: ${props => props.theme.colors.text};
   }
   
-  .value {
+  .description {
+    max-width: 400px;
+    line-height: 1.6;
+    margin-bottom: ${props => props.theme.spacing.lg};
+  }
+`;
+
+const Button = styled(motion.button)`
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border: none;
+  color: white;
+  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.lg};
+  border-radius: ${props => props.theme.borderRadius.md};
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: ${props => props.theme.shadows.md};
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+`;
+
+const StatusBanner = styled(motion.div)`
+  position: absolute;
+  top: ${props => props.theme.spacing.lg};
+  right: ${props => props.theme.spacing.lg};
+  background: ${props => props.connected ? 
+    'linear-gradient(135deg, #4ecdc4, #44a08d)' : 
+    'linear-gradient(135deg, #e74c3c, #c0392b)'};
+  color: white;
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
+  border-radius: ${props => props.theme.borderRadius.md};
+  font-size: 0.9rem;
+  font-weight: 600;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.sm};
+  
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: ${props => props.connected ? 'pulse 2s infinite' : 'none'};
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+`;
+
+const ErrorToast = styled(motion.div)`
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  color: white;
+  padding: 16px 20px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  z-index: 10000;
+  max-width: 400px;
+  
+  .error-title {
     font-weight: 600;
-    color: ${props => props.theme.colors.success};
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .error-message {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    line-height: 1.4;
+  }
+  
+  .error-dismiss {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 18px;
+    opacity: 0.7;
+    
+    &:hover {
+      opacity: 1;
+    }
+  }
+`;
+
+const QuickActionsPanel = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${props => props.theme.spacing.sm};
+  
+  .action-button {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: ${props => props.theme.colors.text};
+    padding: ${props => props.theme.spacing.md};
+    border-radius: ${props => props.theme.borderRadius.md};
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: ${props => props.theme.spacing.sm};
+    transition: all ${props => props.theme.animations.fast};
+    
+    &:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
+    }
+    
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .icon {
+      font-size: 1.1rem;
+    }
   }
 `;
 
 const App = () => {
+  // UI State
   const [backendConnected, setBackendConnected] = useState(false);
   const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(false);
-  const [currentView, setCurrentView] = useState('main');
+  const [showSearchOverlay, setShowSearchOverlay] = useState(false);
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
+  const [currentLayout, setCurrentLayout] = useState('fcose');
+  const [selectedNodeDetails, setSelectedNodeDetails] = useState(null);
   
+  // Store State
   const {
     graphData,
     isLoading,
+    error,
+    selectedNode,
+    stats,
     refreshAllData,
-    setLoading
+    setLoading,
+    setSelectedNode,
+    checkBackendHealth,
+    clearError,
+    performSemanticSearch
   } = useKnowledgeStore();
   
   const analytics = useGraphAnalytics();
@@ -349,7 +405,7 @@ const App = () => {
   useKeyboardShortcuts([
     {
       keys: 'ctrl+k',
-      action: () => console.log('Search shortcut pressed')
+      action: () => setShowSearchOverlay(true)
     },
     {
       keys: 'ctrl+r',
@@ -361,39 +417,137 @@ const App = () => {
     {
       keys: 'ctrl+shift+p',
       action: () => setShowPerformanceMonitor(!showPerformanceMonitor)
+    },
+    {
+      keys: 'ctrl+comma',
+      action: () => setShowSettingsPanel(true)
+    },
+    {
+      keys: 'escape',
+      action: () => {
+        setShowSearchOverlay(false);
+        setShowSettingsPanel(false);
+        setSelectedNodeDetails(null);
+        setSelectedNode(null);
+      }
     }
   ]);
 
-  // Check backend on mount
+  // Initialize app - check backend and load data
   useEffect(() => {
-    const checkBackend = async () => {
+    const initializeApp = async () => {
+      console.log('🚀 Initializing MindCanvas App...');
+      
       try {
-        const response = await fetch('http://localhost:8090/api/health');
-        setBackendConnected(response.ok);
-        if (response.ok) {
-          // Load initial data
+        // Check backend health first
+        const isHealthy = await checkBackendHealth();
+        setBackendConnected(isHealthy);
+        
+        if (isHealthy) {
+          console.log('✅ Backend is healthy, loading data...');
+          
+          // Load all data
           await refreshAllData();
+          
+          console.log('✅ App initialization complete');
+        } else {
+          console.log('❌ Backend is not available');
         }
       } catch (error) {
+        console.error('❌ App initialization failed:', error);
         setBackendConnected(false);
       }
     };
 
-    checkBackend();
-  }, [refreshAllData]);
+    initializeApp();
+  }, [checkBackendHealth, refreshAllData]);
 
+  // Periodic health check
+  useEffect(() => {
+    const healthCheckInterval = setInterval(async () => {
+      try {
+        const isHealthy = await checkBackendHealth();
+        setBackendConnected(isHealthy);
+      } catch (error) {
+        setBackendConnected(false);
+      }
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(healthCheckInterval);
+  }, [checkBackendHealth]);
+
+  // Auto-dismiss error messages
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        clearError();
+      }, 10000); // Auto-dismiss after 10 seconds
+
+      return () => clearTimeout(timer);
+    }
+  }, [error, clearError]);
+
+  // Handle refresh
   const handleRefresh = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
       await refreshAllData();
+      console.log('🔄 Data refreshed successfully');
     } catch (error) {
-      console.error('Refresh failed:', error);
+      console.error('🔄 Refresh failed:', error);
     }
   };
 
-  const handleExportHistory = () => {
-    alert('Chrome extension feature - use the browser extension to export history');
+  // Handle node selection
+  const handleNodeSelect = (node) => {
+    console.log('📌 Node selected:', node);
+    setSelectedNode(node);
+    setSelectedNodeDetails(node);
   };
+
+  // Handle background click
+  const handleBackgroundClick = () => {
+    setSelectedNode(null);
+    setSelectedNodeDetails(null);
+  };
+
+  // Handle layout change
+  const handleLayoutChange = (layout) => {
+    console.log('🎯 Layout changed to:', layout);
+    setCurrentLayout(layout);
+  };
+
+  // Handle search
+  const handleSearch = async (query) => {
+    try {
+      console.log('🔍 Performing search:', query);
+      await performSemanticSearch(query, 20);
+      setShowSearchOverlay(false);
+    } catch (error) {
+      console.error('🔍 Search failed:', error);
+    }
+  };
+
+  // Handle export history (Chrome extension feature)
+  const handleExportHistory = () => {
+    // Check if running in extension context
+    if (typeof window !== 'undefined' && window.chrome && window.chrome.runtime) {
+      // Extension context
+      window.chrome.runtime.sendMessage({ action: 'exportHistory' });
+    } else {
+      // Web context - show instruction
+      alert('📱 To export your browsing history:\n\n1. Install the MindCanvas Chrome extension\n2. Click the extension icon\n3. Click "Export History"\n\nThe extension will send your data to this application.');
+    }
+  };
+
+  // Handle dashboard open
+  const handleOpenDashboard = () => {
+    const dashboardUrl = 'http://localhost:8090/static/index.html';
+    window.open(dashboardUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  // Check if we have graph data
+  const hasGraphData = graphData && graphData.nodes && graphData.nodes.length > 0;
 
   return (
     <ThemeProvider theme={theme}>
@@ -409,51 +563,35 @@ const App = () => {
           <div className="subtitle">AI-Powered Knowledge Graph</div>
         </Header>
 
+        {/* Status Banner */}
+        <StatusBanner
+          connected={backendConnected}
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
+          <div className="status-dot" />
+          {backendConnected ? 'Backend Connected' : 'Backend Offline'}
+        </StatusBanner>
+
         {/* Left Panel - Statistics */}
         <SidePanel
           initial={{ x: -300, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.1 }}
+          style={{ gridArea: 'left-panel' }}
         >
-          <PanelCard>
-            <h3>📊 Overview</h3>
-            <StatusIndicator connected={backendConnected}>
-              <div className="status-dot" />
-              <span>{backendConnected ? 'Backend Connected' : 'Backend Offline'}</span>
-            </StatusIndicator>
-            
-            <StatItem>
-              <span className="label">Total Nodes:</span>
-              <span className="value">{analytics.nodeCount}</span>
-            </StatItem>
-            <StatItem>
-              <span className="label">Total Edges:</span>
-              <span className="value">{analytics.edgeCount}</span>
-            </StatItem>
-            <StatItem>
-              <span className="label">Avg Connections:</span>
-              <span className="value">{analytics.avgConnections}</span>
-            </StatItem>
-            <StatItem>
-              <span className="label">Clusters:</span>
-              <span className="value">{analytics.clusters.length}</span>
-            </StatItem>
-          </PanelCard>
-
-          <PanelCard>
-            <h3>🎯 Content Types</h3>
-            {analytics.clusters.map((cluster, index) => (
-              <StatItem key={index}>
-                <span className="label">{cluster.type}:</span>
-                <span className="value">{cluster.count}</span>
-              </StatItem>
-            ))}
-            {analytics.clusters.length === 0 && (
-              <div style={{ textAlign: 'center', opacity: 0.6 }}>
-                No content clusters yet
-              </div>
-            )}
-          </PanelCard>
+          <StatisticsPanel
+            title="📊 Overview"
+            type="overview"
+            stats={stats}
+          />
+          
+          <StatisticsPanel
+            title="🎯 Content Types"
+            type="contentTypes"
+            data={stats.by_content_type}
+          />
         </SidePanel>
 
         {/* Main Graph Area */}
@@ -462,59 +600,55 @@ const App = () => {
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
+          {/* Controls */}
           <ControlsPanel>
-            <ControlButton
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleRefresh}
-              disabled={isLoading}
-            >
-              {isLoading ? '🔄' : '↻'} Refresh
-            </ControlButton>
-            
-            <ControlButton
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleExportHistory}
-            >
-              📤 Export
-            </ControlButton>
-            
-            <ControlButton
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setShowPerformanceMonitor(!showPerformanceMonitor)}
-            >
-              📊 Performance
-            </ControlButton>
+            <ControlPanel
+              onSearch={() => setShowSearchOverlay(true)}
+              onRefresh={handleRefresh}
+              onLayoutChange={handleLayoutChange}
+              currentLayout={currentLayout}
+              isRefreshing={isLoading}
+            />
           </ControlsPanel>
 
           {/* Graph Visualization */}
-          <GraphVisualization>
-            <div className="graph-icon">🕸️</div>
-            <div className="graph-title">Interactive Knowledge Graph</div>
-            <div className="graph-description">
-              {backendConnected ? (
-                graphData.nodes.length > 0 ? (
-                  `Displaying ${graphData.nodes.length} knowledge nodes with ${graphData.links.length} connections. Use the Chrome extension to add more content to your graph.`
+          {hasGraphData ? (
+            <KnowledgeGraphViewer
+              data={graphData}
+              selectedNode={selectedNode}
+              onNodeSelect={handleNodeSelect}
+              onBackgroundClick={handleBackgroundClick}
+              layout={currentLayout}
+            />
+          ) : (
+            <EmptyGraphState>
+              <div className="icon">🕸️</div>
+              <div className="title">
+                {backendConnected ? 'Knowledge Graph Ready' : 'Backend Offline'}
+              </div>
+              <div className="description">
+                {backendConnected ? (
+                  graphData.nodes.length === 0 ? (
+                    "Your knowledge graph is ready! Use the Chrome extension to export your browsing history and start building your personal knowledge network."
+                  ) : (
+                    `Displaying ${graphData.nodes.length} knowledge nodes with ${graphData.links.length} connections.`
+                  )
                 ) : (
-                  "Your knowledge graph is ready! Use the Chrome extension to export your browsing history and start building your personal knowledge network."
-                )
-              ) : (
-                "Backend server is not connected. Please start the backend server to begin using MindCanvas."
+                  "Please start the backend server to begin using MindCanvas. Check the README for setup instructions."
+                )}
+              </div>
+              
+              {backendConnected && graphData.nodes.length === 0 && (
+                <Button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleExportHistory}
+                >
+                  📱 Use Chrome Extension
+                </Button>
               )}
-            </div>
-            
-            {backendConnected && graphData.nodes.length === 0 && (
-              <Button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleExportHistory}
-              >
-                📱 Use Chrome Extension
-              </Button>
-            )}
-          </GraphVisualization>
+            </EmptyGraphState>
+          )}
 
           {/* Loading Overlay */}
           <AnimatePresence>
@@ -531,46 +665,71 @@ const App = () => {
           </AnimatePresence>
         </MainGraphArea>
 
-        {/* Right Panel - Recommendations */}
+        {/* Right Panel - Analytics & Actions */}
         <SidePanel
           initial={{ x: 300, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.3 }}
+          style={{ gridArea: 'right-panel' }}
         >
-          <PanelCard>
-            <h3>💡 Quick Actions</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <Button
-                whileHover={{ scale: 1.02 }}
+          <StatisticsPanel
+            title="💡 Quick Actions"
+            type="custom"
+          >
+            <QuickActionsPanel>
+              <button 
+                className="action-button"
                 onClick={handleRefresh}
                 disabled={isLoading}
               >
-                🔄 Refresh Data
-              </Button>
-              <Button
-                whileHover={{ scale: 1.02 }}
+                <span className="icon">🔄</span>
+                <span>Refresh Data</span>
+              </button>
+              
+              <button 
+                className="action-button"
                 onClick={handleExportHistory}
               >
-                📤 Export History
-              </Button>
-              <Button
-                whileHover={{ scale: 1.02 }}
-                onClick={() => window.open('http://localhost:8090/static/index.html', '_blank')}
+                <span className="icon">📤</span>
+                <span>Export History</span>
+              </button>
+              
+              <button 
+                className="action-button"
+                onClick={() => setShowSearchOverlay(true)}
               >
-                🌐 Open Dashboard
-              </Button>
-            </div>
-          </PanelCard>
+                <span className="icon">🔍</span>
+                <span>Search Knowledge</span>
+              </button>
+              
+              <button 
+                className="action-button"
+                onClick={() => setShowSettingsPanel(true)}
+              >
+                <span className="icon">⚙️</span>
+                <span>Settings</span>
+              </button>
+              
+              <button 
+                className="action-button"
+                onClick={handleOpenDashboard}
+              >
+                <span className="icon">🌐</span>
+                <span>Open Dashboard</span>
+              </button>
+            </QuickActionsPanel>
+          </StatisticsPanel>
 
-          <PanelCard>
-            <h3>🔥 Recent Activity</h3>
-            <div style={{ textAlign: 'center', opacity: 0.6, padding: '20px 0' }}>
-              <div>📈</div>
-              <div style={{ marginTop: '8px' }}>
-                Activity will appear here as you use the system
-              </div>
-            </div>
-          </PanelCard>
+          <StatisticsPanel
+            title="📈 Analytics"
+            type="analytics"
+            data={{
+              nodeCount: analytics.nodeCount,
+              edgeCount: analytics.edgeCount,
+              avgConnections: analytics.avgConnections,
+              clusters: analytics.clusters.length
+            }}
+          />
         </SidePanel>
 
         {/* Chatbot Area */}
@@ -579,17 +738,41 @@ const App = () => {
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.4 }}
         >
-          <div style={{ textAlign: 'center', opacity: 0.8 }}>
-            <div style={{ fontSize: '2rem', marginBottom: '16px' }}>🤖</div>
-            <div style={{ fontSize: '1.2rem', marginBottom: '8px' }}>AI Chatbot</div>
-            <div style={{ fontSize: '0.9rem', opacity: 0.7 }}>
-              {backendConnected ? 
-                'Chat functionality will be available once you have content in your knowledge graph' :
-                'Connect to backend to enable AI chat features'
-              }
-            </div>
-          </div>
+          <ChatbotPanel graphData={graphData} />
         </ChatbotArea>
+
+        {/* Modals and Overlays */}
+        <AnimatePresence>
+          {showSearchOverlay && (
+            <SearchOverlay
+              onClose={() => setShowSearchOverlay(false)}
+              onSearch={handleSearch}
+              graphData={graphData}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showSettingsPanel && (
+            <SettingsPanel
+              isOpen={showSettingsPanel}
+              onClose={() => setShowSettingsPanel(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {selectedNodeDetails && (
+            <NodeDetailsModal
+              node={selectedNodeDetails}
+              onClose={() => {
+                setSelectedNodeDetails(null);
+                setSelectedNode(null);
+              }}
+              graphData={graphData}
+            />
+          )}
+        </AnimatePresence>
 
         {/* Performance Monitor */}
         <PerformanceMonitor
@@ -597,6 +780,29 @@ const App = () => {
           nodeCount={analytics.nodeCount}
           edgeCount={analytics.edgeCount}
         />
+
+        {/* Error Display */}
+        <AnimatePresence>
+          {error && (
+            <ErrorToast
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
+            >
+              <button 
+                className="error-dismiss"
+                onClick={clearError}
+                aria-label="Dismiss error"
+              >
+                ×
+              </button>
+              <div className="error-title">
+                ⚠️ Error
+              </div>
+              <div className="error-message">{error}</div>
+            </ErrorToast>
+          )}
+        </AnimatePresence>
       </AppContainer>
     </ThemeProvider>
   );
