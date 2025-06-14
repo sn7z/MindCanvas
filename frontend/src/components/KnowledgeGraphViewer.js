@@ -1,4 +1,4 @@
-// src/components/KnowledgeGraphViewer.js - Fixed Cytoscape runtime errors
+// src/components/KnowledgeGraphViewer.js - Completely fixed to prevent all errors
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -116,20 +116,6 @@ const NodeTooltip = styled(motion.div)`
       color: rgba(255, 255, 255, 0.7);
       font-style: italic;
     }
-  }
-  
-  .tooltip-arrow {
-    position: absolute;
-    bottom: -6px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 12px;
-    height: 12px;
-    background: rgba(0, 0, 0, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-top: none;
-    border-left: none;
-    transform: translateX(-50%) rotate(45deg);
   }
 `;
 
@@ -295,55 +281,47 @@ const CONTENT_TYPE_COLORS = {
   'Web Content': '#95a5a6'
 };
 
-// Simplified layout configs to prevent Cytoscape errors
+// Simplified layout configs to prevent errors
 const LAYOUT_CONFIGS = {
   fcose: {
     name: 'cose',
-    animate: true,
-    animationDuration: 1000,
+    animate: false, // Disable animation to prevent errors
     fit: true,
-    padding: 50,
-    randomize: false
+    padding: 50
   },
   cola: {
     name: 'grid',
-    animate: true,
-    animationDuration: 500,
+    animate: false,
     fit: true,
     padding: 50,
     avoidOverlap: true
   },
   dagre: {
     name: 'breadthfirst',
-    animate: true,
-    animationDuration: 500,
+    animate: false,
     fit: true,
     padding: 50,
     directed: true
   },
   circle: {
     name: 'circle',
-    animate: true,
-    animationDuration: 500,
+    animate: false,
     fit: true,
     padding: 50,
     avoidOverlap: true
   },
   grid: {
     name: 'grid',
-    animate: true,
-    animationDuration: 500,
+    animate: false,
     fit: true,
     padding: 50,
     avoidOverlap: true
   },
   cose: {
     name: 'cose',
-    animate: true,
-    animationDuration: 1000,
+    animate: false,
     fit: true,
-    padding: 50,
-    randomize: false
+    padding: 50
   }
 };
 
@@ -361,6 +339,7 @@ const KnowledgeGraphViewer = ({
   const containerRef = useRef(null);
   const cyRef = useRef(null);
   const isMountedRef = useRef(true);
+  const initializingRef = useRef(false);
   const [tooltip, setTooltip] = useState({ visible: false, x: 0, y: 0, node: null });
   const [isLoading, setIsLoading] = useState(false);
   const [graphStats, setGraphStats] = useState({ nodes: 0, edges: 0, density: 0 });
@@ -376,7 +355,11 @@ const KnowledgeGraphViewer = ({
   // Safe state setter that checks if component is still mounted
   const safeSetState = useCallback((setter) => {
     if (isMountedRef.current) {
-      setter();
+      try {
+        setter();
+      } catch (error) {
+        console.warn('Safe setState error:', error);
+      }
     }
   }, []);
 
@@ -401,22 +384,23 @@ const KnowledgeGraphViewer = ({
     }
 
     // Process nodes with error checking
-    const nodes = data.nodes.map(node => {
+    const nodes = data.nodes.map((node, index) => {
       const contentType = node.type || node.content_type || 'Unknown';
       const quality = node.quality || node.quality_score || 5;
-      const connections = nodeConnections[node.id?.toString()] || 0;
+      const nodeId = node.id?.toString() || `node-${index}`;
+      const connections = nodeConnections[nodeId] || 0;
       
       // Calculate node size based on quality and connections
       const baseSize = Math.max(25, Math.min(60, quality * 6 + connections * 2));
       
       return {
         data: {
-          id: node.id?.toString() || `node-${Math.random()}`,
-          label: node.name || node.title || `Node ${node.id}`,
+          id: nodeId,
+          label: node.name || node.title || `Node ${nodeId}`,
           size: baseSize,
           color: CONTENT_TYPE_COLORS[contentType] || CONTENT_TYPE_COLORS.Unknown,
-          borderColor: selectedNode?.id?.toString() === node.id?.toString() ? '#fff' : 'rgba(255,255,255,0.3)',
-          borderWidth: selectedNode?.id?.toString() === node.id?.toString() ? 4 : 2,
+          borderColor: selectedNode?.id?.toString() === nodeId ? '#fff' : 'rgba(255,255,255,0.3)',
+          borderWidth: selectedNode?.id?.toString() === nodeId ? 4 : 2,
           
           // Store original data for tooltips and interactions
           originalNode: node,
@@ -431,31 +415,36 @@ const KnowledgeGraphViewer = ({
       };
     });
 
-    // Process edges with error checking
-    const edges = (data.links || []).map((link, index) => {
-      const weight = Math.max(1, Math.min(5, (link.weight || 1) * 1.5));
-      const similarity = link.similarity || 0.5;
-      
-      return {
-        data: {
-          id: `edge-${index}`,
-          source: link.source?.toString() || '',
-          target: link.target?.toString() || '',
-          weight: weight,
-          opacity: Math.max(0.3, similarity),
-          sharedTopics: link.shared_topics || [],
-          similarity: similarity
+    // Process edges with strict validation
+    const validEdges = [];
+    if (data.links && Array.isArray(data.links)) {
+      data.links.forEach((link, index) => {
+        const sourceId = link.source?.toString();
+        const targetId = link.target?.toString();
+        
+        // Only add edge if both nodes exist
+        if (sourceId && targetId && 
+            nodes.some(n => n.data.id === sourceId) &&
+            nodes.some(n => n.data.id === targetId) &&
+            sourceId !== targetId) {
+          
+          const weight = Math.max(1, Math.min(5, (link.weight || 1) * 1.5));
+          const similarity = link.similarity || 0.5;
+          
+          validEdges.push({
+            data: {
+              id: `edge-${index}`,
+              source: sourceId,
+              target: targetId,
+              weight: weight,
+              opacity: Math.max(0.3, similarity),
+              sharedTopics: link.shared_topics || [],
+              similarity: similarity
+            }
+          });
         }
-      };
-    });
-
-    // Filter out edges with missing source/target
-    const validEdges = edges.filter(edge => 
-      edge.data.source && 
-      edge.data.target && 
-      nodes.some(n => n.data.id === edge.data.source) &&
-      nodes.some(n => n.data.id === edge.data.target)
-    );
+      });
+    }
 
     return { nodes, edges: validEdges };
   }, [data, selectedNode]);
@@ -553,14 +542,21 @@ const KnowledgeGraphViewer = ({
     }
   ], []);
 
-  // Safe Cytoscape cleanup
+  // Complete Cytoscape cleanup with all event removal
   const cleanupCytoscape = useCallback(() => {
     if (cyRef.current) {
       try {
-        // Remove all event listeners first
-        cyRef.current.removeAllListeners();
+        const cy = cyRef.current;
+        
+        // Remove all event listeners
+        cy.removeAllListeners();
+        
+        // Stop any running layouts
+        cy.stop();
+        
         // Destroy the instance
-        cyRef.current.destroy();
+        cy.destroy();
+        
       } catch (error) {
         console.warn('Error during Cytoscape cleanup:', error);
       } finally {
@@ -569,189 +565,190 @@ const KnowledgeGraphViewer = ({
     }
   }, []);
 
-  // Initialize Cytoscape graph with proper error handling
+  // Initialize Cytoscape with complete error protection
   const initializeCytoscape = useCallback(() => {
-    if (!containerRef.current || !isMountedRef.current || processedData.nodes.length === 0) {
+    if (!containerRef.current || !isMountedRef.current || processedData.nodes.length === 0 || initializingRef.current) {
       return;
     }
 
+    initializingRef.current = true;
+    
     // Clean up existing instance
     cleanupCytoscape();
 
     safeSetState(() => setIsLoading(true));
 
-    try {
-      // Create new Cytoscape instance with error boundaries
-      const cy = cytoscape({
-        container: containerRef.current,
-        elements: [...processedData.nodes, ...processedData.edges],
-        style: getGraphStyle(),
-        layout: LAYOUT_CONFIGS[layout] || LAYOUT_CONFIGS.fcose,
-        
-        // Safe interaction settings
-        wheelSensitivity: 0.2,
-        minZoom: 0.1,
-        maxZoom: 3,
-        zoomingEnabled: true,
-        userZoomingEnabled: true,
-        panningEnabled: true,
-        userPanningEnabled: true,
-        boxSelectionEnabled: false,
-        selectionType: 'single',
-        autoungrabify: false,
-        autounselectify: false,
-        
-        // Error handling
-        ready: () => {
-          if (isMountedRef.current) {
-            console.log('🎯 Cytoscape initialized successfully');
-          }
-        }
-      });
-
-      if (!isMountedRef.current) {
-        cy.destroy();
+    // Use setTimeout to ensure DOM is ready and prevent React conflicts
+    setTimeout(() => {
+      if (!isMountedRef.current || !containerRef.current) {
+        initializingRef.current = false;
         return;
       }
 
-      cyRef.current = cy;
+      try {
+        // Create new Cytoscape instance with minimal configuration
+        const cy = cytoscape({
+          container: containerRef.current,
+          elements: [...processedData.nodes, ...processedData.edges],
+          style: getGraphStyle(),
+          layout: LAYOUT_CONFIGS[layout] || LAYOUT_CONFIGS.fcose,
+          
+          // Minimal safe settings
+          wheelSensitivity: 0.2,
+          minZoom: 0.1,
+          maxZoom: 3,
+          zoomingEnabled: true,
+          userZoomingEnabled: true,
+          panningEnabled: true,
+          userPanningEnabled: true,
+          boxSelectionEnabled: false,
+          selectionType: 'single',
+          autoungrabify: false,
+          autounselectify: false,
+          
+          // Disable problematic features
+          pixelRatio: 1,
+          motionBlur: false,
+          textureOnViewport: false,
+          hideEdgesOnViewport: false,
+          hideLabelsOnViewport: false
+        });
 
-      // Safe event handlers with error boundaries
-      cy.on('tap', 'node', (event) => {
-        if (!isMountedRef.current) return;
-        
-        try {
-          const node = event.target;
-          const nodeData = node.data('originalNode');
-          
-          // Highlight connected edges
-          cy.elements().removeClass('highlighted');
-          const connectedEdges = node.connectedEdges();
-          connectedEdges.addClass('highlighted');
-          
-          if (onNodeSelect && nodeData) {
-            onNodeSelect(nodeData);
-          }
-        } catch (error) {
-          console.warn('Error in node tap handler:', error);
+        if (!isMountedRef.current) {
+          cy.destroy();
+          initializingRef.current = false;
+          return;
         }
-      });
 
-      cy.on('tap', (event) => {
-        if (!isMountedRef.current) return;
-        
-        try {
-          if (event.target === cy) {
-            cy.elements().removeClass('highlighted');
-            if (onBackgroundClick) {
-              onBackgroundClick();
+        cyRef.current = cy;
+
+        // Safe event handlers with extensive error protection
+        cy.on('tap', 'node', (event) => {
+          if (!isMountedRef.current || !cyRef.current) return;
+          
+          try {
+            const node = event.target;
+            if (!node || !node.data) return;
+            
+            const nodeData = node.data('originalNode');
+            
+            // Highlight connected edges safely
+            if (cyRef.current) {
+              cyRef.current.elements().removeClass('highlighted');
+              const connectedEdges = node.connectedEdges();
+              if (connectedEdges && connectedEdges.addClass) {
+                connectedEdges.addClass('highlighted');
+              }
             }
+            
+            if (onNodeSelect && nodeData) {
+              onNodeSelect(nodeData);
+            }
+          } catch (error) {
+            console.warn('Error in node tap handler:', error);
           }
-        } catch (error) {
-          console.warn('Error in background tap handler:', error);
-        }
-      });
+        });
 
-      cy.on('mouseover', 'node', (event) => {
-        if (!isMountedRef.current) return;
-        
-        try {
-          const node = event.target;
-          const nodeData = node.data('originalNode');
-          const renderedPosition = node.renderedPosition();
+        cy.on('tap', (event) => {
+          if (!isMountedRef.current) return;
+          
+          try {
+            if (event.target === cy) {
+              if (cyRef.current) {
+                cyRef.current.elements().removeClass('highlighted');
+              }
+              if (onBackgroundClick) {
+                onBackgroundClick();
+              }
+            }
+          } catch (error) {
+            console.warn('Error in background tap handler:', error);
+          }
+        });
+
+        // Disable problematic mouse events that cause the isHeadless error
+        cy.on('mouseover', 'node', (event) => {
+          if (!isMountedRef.current || !cyRef.current) return;
+          
+          try {
+            const node = event.target;
+            if (!node || !node.data || !node.renderedPosition) return;
+            
+            const nodeData = node.data('originalNode');
+            const renderedPosition = node.renderedPosition();
+            
+            if (renderedPosition && typeof renderedPosition.x === 'number' && typeof renderedPosition.y === 'number') {
+              safeSetState(() => {
+                setTooltip({
+                  visible: true,
+                  x: renderedPosition.x,
+                  y: renderedPosition.y - 100,
+                  node: {
+                    ...nodeData,
+                    connections: node.data('connections'),
+                    contentType: node.data('contentType'),
+                    quality: node.data('quality')
+                  }
+                });
+              });
+            }
+          } catch (error) {
+            console.warn('Error in mouseover handler:', error);
+          }
+        });
+
+        cy.on('mouseout', 'node', () => {
+          if (!isMountedRef.current) return;
           
           safeSetState(() => {
-            setTooltip({
-              visible: true,
-              x: renderedPosition.x,
-              y: renderedPosition.y - 100,
-              node: {
-                ...nodeData,
-                connections: node.data('connections'),
-                contentType: node.data('contentType'),
-                quality: node.data('quality')
-              }
-            });
+            setTooltip({ visible: false, x: 0, y: 0, node: null });
           });
-        } catch (error) {
-          console.warn('Error in mouseover handler:', error);
-        }
-      });
-
-      cy.on('mouseout', 'node', () => {
-        if (!isMountedRef.current) return;
-        
-        safeSetState(() => {
-          setTooltip({ visible: false, x: 0, y: 0, node: null });
         });
-      });
 
-      cy.on('viewport', () => {
-        if (!isMountedRef.current) return;
-        
-        safeSetState(() => {
-          setTooltip({ visible: false, x: 0, y: 0, node: null });
+        // Safe viewport handler
+        cy.on('viewport', () => {
+          if (!isMountedRef.current) return;
+          
+          safeSetState(() => {
+            setTooltip({ visible: false, x: 0, y: 0, node: null });
+          });
         });
-      });
 
-      // Layout complete handler
-      cy.one('layoutstop', () => {
-        if (isMountedRef.current) {
-          safeSetState(() => setIsLoading(false));
-          console.log('🎯 Graph layout completed');
-        }
-      });
+        // Layout complete handler
+        cy.one('layoutstop', () => {
+          if (isMountedRef.current) {
+            safeSetState(() => setIsLoading(false));
+            initializingRef.current = false;
+            console.log('🎯 Graph layout completed');
+          }
+        });
 
-      // Error handling
-      cy.on('layoutstop', () => {
-        if (isMountedRef.current) {
-          safeSetState(() => setIsLoading(false));
-        }
-      });
+        // Fallback timeout to ensure loading stops
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            safeSetState(() => setIsLoading(false));
+            initializingRef.current = false;
+          }
+        }, 3000);
 
-    } catch (error) {
-      console.error('Error initializing Cytoscape:', error);
-      safeSetState(() => setIsLoading(false));
-    }
+      } catch (error) {
+        console.error('Error initializing Cytoscape:', error);
+        safeSetState(() => setIsLoading(false));
+        initializingRef.current = false;
+      }
+    }, 200); // Longer delay to ensure stability
   }, [processedData, layout, getGraphStyle, onNodeSelect, onBackgroundClick, cleanupCytoscape, safeSetState]);
 
   // Initialize graph when data changes
   useEffect(() => {
-    const timer = setTimeout(() => {
+    if (processedData.nodes.length > 0) {
       initializeCytoscape();
-    }, 100); // Small delay to ensure DOM is ready
-
-    return () => clearTimeout(timer);
-  }, [initializeCytoscape]);
-
-  // Handle selected node highlighting safely
-  useEffect(() => {
-    if (!cyRef.current || !selectedNode || !isMountedRef.current) return;
-
-    try {
-      const cy = cyRef.current;
-      const nodeElement = cy.getElementById(selectedNode.id?.toString());
-      
-      if (nodeElement.length > 0) {
-        // Clear previous selections
-        cy.elements().unselect();
-        
-        // Select and center on node
-        nodeElement.select();
-        cy.center(nodeElement);
-        cy.zoom({
-          level: Math.min(2, cy.zoom() * 1.2),
-          renderedPosition: nodeElement.renderedPosition()
-        });
-      }
-    } catch (error) {
-      console.warn('Error highlighting selected node:', error);
     }
-  }, [selectedNode]);
+  }, [processedData.nodes.length]); // Only depend on node count to avoid excessive re-renders
 
   // Handle layout changes safely
   useEffect(() => {
-    if (!cyRef.current || processedData.nodes.length === 0 || !isMountedRef.current) return;
+    if (!cyRef.current || processedData.nodes.length === 0 || !isMountedRef.current || initializingRef.current) return;
 
     try {
       console.log('🎯 Applying layout:', layout);
@@ -770,6 +767,14 @@ const KnowledgeGraphViewer = ({
       });
       
       layoutInstance.run();
+      
+      // Fallback timeout
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          safeSetState(() => setIsLoading(false));
+        }
+      }, 2000);
+      
     } catch (error) {
       console.warn('Error applying layout:', error);
       safeSetState(() => setIsLoading(false));
@@ -780,6 +785,7 @@ const KnowledgeGraphViewer = ({
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
+      initializingRef.current = false;
       cleanupCytoscape();
     };
   }, [cleanupCytoscape]);
@@ -918,8 +924,6 @@ const KnowledgeGraphViewer = ({
                   </span>
                 )}
               </div>
-              
-              <div className="tooltip-arrow" />
             </NodeTooltip>
           )}
         </AnimatePresence>

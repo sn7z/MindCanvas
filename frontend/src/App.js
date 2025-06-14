@@ -1,4 +1,4 @@
-// src/App.js - Complete implementation without ESLint errors
+// src/App.js - Final complete working implementation
 import React, { useState, useEffect } from 'react';
 import styled, { ThemeProvider, createGlobalStyle } from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -72,12 +72,12 @@ const GlobalStyle = createGlobalStyle`
     font-family: ${props => props.theme.fonts.primary};
     background: ${props => props.theme.colors.bg};
     color: ${props => props.theme.colors.text};
-    overflow: hidden;
     height: 100%;
+    overflow: auto; /* Allow scrolling */
   }
   
   #root {
-    height: 100vh;
+    min-height: 100vh;
     width: 100vw;
   }
 
@@ -96,28 +96,30 @@ const GlobalStyle = createGlobalStyle`
 `;
 
 const AppContainer = styled.div`
-  height: 100vh;
+  min-height: 100vh;
   width: 100vw;
   display: grid;
   grid-template-areas: 
     "left-panel main-graph right-panel"
     "chatbot chatbot chatbot";
   grid-template-columns: 320px 1fr 320px;
-  grid-template-rows: 1fr 220px;
+  grid-template-rows: minmax(600px, 1fr) 300px; /* Fixed chatbot height */
   gap: ${props => props.theme.spacing.md};
   padding: ${props => props.theme.spacing.md};
   
   @media (max-width: 1200px) {
     grid-template-areas: 
       "main-graph"
+      "left-panel"
+      "right-panel"
       "chatbot";
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr 250px;
+    grid-template-rows: minmax(400px, 60vh) auto auto 300px;
   }
 `;
 
 const Header = styled(motion.div)`
-  position: absolute;
+  position: fixed;
   top: ${props => props.theme.spacing.lg};
   left: 50%;
   transform: translateX(-50%);
@@ -155,15 +157,19 @@ const MainGraphArea = styled(motion.div)`
   position: relative;
   display: flex;
   flex-direction: column;
+  min-height: 600px;
 `;
 
 const SidePanel = styled(motion.div)`
   display: flex;
   flex-direction: column;
   gap: ${props => props.theme.spacing.md};
+  max-height: 100vh;
+  overflow-y: auto;
   
   @media (max-width: 1200px) {
-    display: none;
+    max-height: none;
+    overflow-y: visible;
   }
 `;
 
@@ -175,6 +181,7 @@ const ChatbotArea = styled(motion.div)`
   border: 1px solid ${props => props.theme.colors.border};
   box-shadow: ${props => props.theme.shadows.md};
   overflow: hidden;
+  height: 300px; /* Fixed height for chatbot */
 `;
 
 const ControlsPanel = styled(motion.div)`
@@ -267,7 +274,7 @@ const Button = styled(motion.button)`
 `;
 
 const StatusBanner = styled(motion.div)`
-  position: absolute;
+  position: fixed;
   top: ${props => props.theme.spacing.lg};
   right: ${props => props.theme.spacing.lg};
   background: ${props => props.connected ? 
@@ -391,12 +398,19 @@ const App = () => {
     error,
     selectedNode,
     stats,
+    allContent,
+    trending,
+    recommendations,
     refreshAllData,
     setLoading,
     setSelectedNode,
     checkBackendHealth,
     clearError,
-    performSemanticSearch
+    performSemanticSearch,
+    loadStats,
+    loadContent,
+    loadTrending,
+    loadRecommendations
   } = useKnowledgeStore();
   
   const analytics = useGraphAnalytics();
@@ -444,10 +458,16 @@ const App = () => {
         setBackendConnected(isHealthy);
         
         if (isHealthy) {
-          console.log('✅ Backend is healthy, loading data...');
+          console.log('✅ Backend is healthy, loading all data...');
           
-          // Load all data
-          await refreshAllData();
+          // Load all data in parallel
+          await Promise.allSettled([
+            refreshAllData(),
+            loadStats(),
+            loadContent(),
+            loadTrending(),
+            loadRecommendations()
+          ]);
           
           console.log('✅ App initialization complete');
         } else {
@@ -460,7 +480,7 @@ const App = () => {
     };
 
     initializeApp();
-  }, [checkBackendHealth, refreshAllData]);
+  }, [checkBackendHealth, refreshAllData, loadStats, loadContent, loadTrending, loadRecommendations]);
 
   // Periodic health check
   useEffect(() => {
@@ -491,7 +511,13 @@ const App = () => {
   const handleRefresh = async () => {
     try {
       setLoading(true);
-      await refreshAllData();
+      await Promise.allSettled([
+        refreshAllData(),
+        loadStats(),
+        loadContent(),
+        loadTrending(),
+        loadRecommendations()
+      ]);
       console.log('🔄 Data refreshed successfully');
     } catch (error) {
       console.error('🔄 Refresh failed:', error);
@@ -549,6 +575,18 @@ const App = () => {
   // Check if we have graph data
   const hasGraphData = graphData && graphData.nodes && graphData.nodes.length > 0;
 
+  // Prepare stats for panels
+  const overviewStats = {
+    totalContent: stats.total_content || 0,
+    vectorEnabled: stats.vector_enabled || 0,
+    avgQuality: stats.avg_quality || 0,
+    clusters: stats.content_clusters || 0
+  };
+
+  const contentTypeData = stats.by_content_type || {};
+  const trendingData = trending || [];
+  const recommendationsData = recommendations || [];
+
   return (
     <ThemeProvider theme={theme}>
       <GlobalStyle />
@@ -584,14 +622,23 @@ const App = () => {
           <StatisticsPanel
             title="📊 Overview"
             type="overview"
+            data={overviewStats}
             stats={stats}
           />
           
           <StatisticsPanel
             title="🎯 Content Types"
             type="contentTypes"
-            data={stats.by_content_type}
+            data={contentTypeData}
           />
+
+          {trendingData.length > 0 && (
+            <StatisticsPanel
+              title="🔥 Trending Topics"
+              type="trending"
+              trending={trendingData}
+            />
+          )}
         </SidePanel>
 
         {/* Main Graph Area */}
@@ -628,17 +675,17 @@ const App = () => {
               </div>
               <div className="description">
                 {backendConnected ? (
-                  graphData.nodes.length === 0 ? (
+                  graphData.nodes?.length === 0 ? (
                     "Your knowledge graph is ready! Use the Chrome extension to export your browsing history and start building your personal knowledge network."
                   ) : (
-                    `Displaying ${graphData.nodes.length} knowledge nodes with ${graphData.links.length} connections.`
+                    `Displaying ${graphData.nodes?.length} knowledge nodes with ${graphData.links?.length} connections.`
                   )
                 ) : (
                   "Please start the backend server to begin using MindCanvas. Check the README for setup instructions."
                 )}
               </div>
               
-              {backendConnected && graphData.nodes.length === 0 && (
+              {backendConnected && (!graphData.nodes || graphData.nodes.length === 0) && (
                 <Button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -730,6 +777,14 @@ const App = () => {
               clusters: analytics.clusters.length
             }}
           />
+
+          {recommendationsData.length > 0 && (
+            <StatisticsPanel
+              title="💡 Recommendations"
+              type="recommendations"
+              data={recommendationsData}
+            />
+          )}
         </SidePanel>
 
         {/* Chatbot Area */}
