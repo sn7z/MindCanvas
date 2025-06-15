@@ -1,6 +1,7 @@
+# backend/main.py - Fixed RAG chatbot integration
 """
-MindCanvas - Simple & Working Implementation
-Clean FastAPI backend with Supabase vector database
+MindCanvas - Fixed Implementation with Working RAG Chatbot
+Clean FastAPI backend with Supabase vector database and functional chat
 """
 
 import asyncio
@@ -22,6 +23,10 @@ from bs4 import BeautifulSoup
 from openai import OpenAI
 from groq import Groq
 
+# Add LangChain imports
+from langchain_community.chat_models import ChatOpenAI
+from langchain_community.embeddings import OpenAIEmbeddings
+
 import asyncio
 import json
 import os
@@ -29,11 +34,9 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from collections import defaultdict, Counter
 import numpy as np
-from sklearn.cluster import DBSCAN
-from sklearn.metrics.pairwise import cosine_similarity
 
+# Import the fixed RAG chatbot and Supabase DB
 from rag_chatbot import RAGChatbot, ChatRequest, ChatResponse, ChatMessage
-
 from supabase_db import SimpleVectorDB, ContentItem, init_db
 
 # Configuration
@@ -54,12 +57,10 @@ EXCLUDED_DOMAINS = {
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="MindCanvas", version="1.0")
-
-# Global database
+# Global database and RAG chatbot
 db: SimpleVectorDB = None
+rag_chatbot: RAGChatbot = None
 
-rag_chatbot = RAGChatbot(db, OPENAI_API_KEY, GROQ_API_KEY)
 # Models
 class HistoryItem(BaseModel):
     url: str
@@ -393,6 +394,13 @@ async def process_urls(items: List[HistoryItem]) -> Dict[str, int]:
                 content_hash=processed_item['content_hash']
             )
             
+            # Also generate and store embedding
+            embedding = await db.generate_embedding(
+                f"{content_item.title} {content_item.summary}", 
+                use_openai=bool(OPENAI_API_KEY)
+            )
+            content_item.embedding = embedding
+            
             success = await db.store_content(content_item)
             if success:
                 stored_count += 1
@@ -415,35 +423,33 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    global db
-    db = await init_db()
+    global db, rag_chatbot
+    
+    # Initialize database with OpenAI API key for embeddings
+    db = await init_db(OPENAI_API_KEY)
+    
+    # Initialize RAG chatbot with better error handling
+    try:
+        rag_chatbot = RAGChatbot(db, OPENAI_API_KEY, GROQ_API_KEY)
+        logger.info("✅ RAG Chatbot initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ RAG Chatbot initialization failed: {e}")
+        rag_chatbot = None
+    
     logger.info("✅ MindCanvas started")
     yield
     # Shutdown (if needed)
 
-# Update app with lifespan
-app = FastAPI(title="MindCanvas", version="1.0", lifespan=lifespan) # Initialize app with lifespan
+# Initialize app with lifespan
+app = FastAPI(title="MindCanvas", version="1.0", lifespan=lifespan)
 
-# Add CORS to the correct app instance
+# Add CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# # Serve static files from the correct app instance
-# import os
-# static_dir = os.path.join(os.path.dirname(__file__), "static")
-# if not os.path.exists(static_dir):
-#     os.makedirs(static_dir) # This will create backend/static if it doesn't exist
-#     logger.info(f"Created static directory: {static_dir}")
-
-# try:
-#     app.mount("/static", StaticFiles(directory=static_dir), name="static")
-#     logger.info(f"Serving static files from: {static_dir}")
-# except Exception as e:
-#     logger.error(f"Failed to mount static files: {e}")
 
 # API Endpoints
 @app.post("/api/ingest")
@@ -468,21 +474,48 @@ async def ingest_history(items: List[HistoryItem]):
             "total": len(items)
         }
 
-
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_with_knowledge_base(request: ChatRequest):
     """Chat with AI using knowledge base context"""
     try:
+        if not rag_chatbot:
+            return ChatResponse(
+                response="I'm sorry, the AI assistant is currently unavailable. Please ensure OpenAI API key is configured.",
+                sources=[],
+                confidence=0.1,
+                processing_time=0.0,
+                tokens_used=0,
+                conversation_id=""
+            )
+        
         response = await rag_chatbot.process_chat_request(request)
         return response
     except Exception as e:
         logger.error(f"Chat request failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return ChatResponse(
+            response=f"I encountered an error: {str(e)}. Please try again.",
+            sources=[],
+            confidence=0.1,
+            processing_time=0.0,
+            tokens_used=0,
+            conversation_id=""
+        )
 
 @app.get("/api/chat/suggestions")
 async def get_chat_suggestions(limit: int = 5):
     """Get suggested questions based on knowledge base"""
     try:
+        if not rag_chatbot:
+            return {
+                "suggestions": [
+                    "What topics have I been learning about?",
+                    "Can you help me explore my knowledge?",
+                    "What would you recommend I learn next?",
+                    "Show me my recent browsing patterns"
+                ],
+                "timestamp": datetime.now().isoformat()
+            }
+        
         suggestions = await rag_chatbot.get_suggested_questions(limit)
         return {
             "suggestions": suggestions,
@@ -490,11 +523,18 @@ async def get_chat_suggestions(limit: int = 5):
         }
     except Exception as e:
         logger.error(f"Failed to get suggestions: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "suggestions": ["How can I help you today?"],
+            "timestamp": datetime.now().isoformat()
+        }
+
 
 @app.post("/api/chat/insights")
 async def get_conversation_insights(conversation_history: List[ChatMessage]):
     """Analyze conversation for insights"""
+    if not rag_chatbot:
+        raise HTTPException(status_code=503, detail="RAG chatbot not available")
+    
     try:
         insights = await rag_chatbot.get_conversation_insights(conversation_history)
         return {
@@ -508,18 +548,23 @@ async def get_conversation_insights(conversation_history: List[ChatMessage]):
 @app.get("/api/chat/context/{query}")
 async def get_chat_context(query: str, limit: int = 5, threshold: float = 0.3):
     """Get relevant context for a query (for debugging/preview)"""
+    if not rag_chatbot:
+        raise HTTPException(status_code=503, detail="RAG chatbot not available")
+    
     try:
-        context_items = await rag_chatbot._retrieve_relevant_context(query, limit, threshold)
+        # Get the documents from the vector database
+        docs = await db.get_documents_by_query(query, limit, threshold)
         
         formatted_context = []
-        for item in context_items:
+        for doc in docs:
             formatted_context.append({
-                "title": item.title,
-                "summary": item.summary,
-                "content_type": item.content_type,
-                "quality_score": item.quality_score,
-                "similarity": round(item.similarity, 3),
-                "url": item.url
+                "title": doc.metadata.get("title", "Unknown"),
+                "summary": doc.metadata.get("summary", ""),
+                "content_type": doc.metadata.get("content_type", "Unknown"),
+                "quality_score": doc.metadata.get("quality_score", 0),
+                "similarity": round(doc.metadata.get("similarity", 0), 3),
+                "url": doc.metadata.get("url", ""),
+                "content_preview": doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content
             })
         
         return {
@@ -535,25 +580,37 @@ async def get_chat_context(query: str, limit: int = 5, threshold: float = 0.3):
 async def chat_health_check():
     """Check chatbot system health"""
     try:
-        # Test embeddings
-        test_embedding = rag_chatbot.embedder.encode("test query")
-        embedding_ok = len(test_embedding) > 0
+        openai_ok = bool(OPENAI_API_KEY)
+        rag_ok = rag_chatbot is not None
+        vector_ok = db is not None
         
-        # Test LLM connections
-        groq_ok = rag_chatbot.groq_client is not None
-        openai_ok = rag_chatbot.openai_client is not None
+        try:
+            test_query = db.client.table('processed_content').select('id').limit(1).execute()
+            db_ok = test_query is not None
+        except:
+            db_ok = False
         
-        # Test database connection
-        test_query = rag_chatbot.db.client.table('processed_content').select('id').limit(1).execute()
-        db_ok = test_query is not None
+        # Try to get an embedding to verify the LangChain integration is working
+        embeddings_ok = False
+        if openai_ok:
+            try:
+                embedder = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+                embedding = embedder.embed_query("test")
+                embeddings_ok = len(embedding) > 0
+            except Exception as e:
+                logger.error(f"Embedding test failed: {e}")
+                embeddings_ok = False
+        
+        status = "healthy" if all([openai_ok, rag_ok, db_ok, embeddings_ok]) else "degraded"
         
         return {
-            "status": "healthy" if all([embedding_ok, (groq_ok or openai_ok), db_ok]) else "degraded",
+            "status": status,
             "components": {
-                "embeddings": "ok" if embedding_ok else "error",
-                "groq_llm": "ok" if groq_ok else "unavailable",
-                "openai_llm": "ok" if openai_ok else "unavailable",
-                "database": "ok" if db_ok else "error"
+                "openai_api": "ok" if openai_ok else "error",
+                "rag_chatbot": "ok" if rag_ok else "error", 
+                "vector_store": "ok" if vector_ok else "error",
+                "database": "ok" if db_ok else "error",
+                "embeddings": "ok" if embeddings_ok else "error"
             },
             "timestamp": datetime.now().isoformat()
         }
@@ -562,7 +619,7 @@ async def chat_health_check():
             "status": "unhealthy",
             "error": str(e),
             "timestamp": datetime.now().isoformat()
-        }
+        } 
     
 @app.get("/api/content")
 async def get_content(limit: int = 100):
@@ -717,610 +774,6 @@ async def export_knowledge_graph():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/analytics/advanced")
-async def get_advanced_analytics(days: int = 30, include_trends: bool = True):
-    """Get comprehensive analytics with trend analysis"""
-    try:
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=days)
-        
-        # Get content data
-        response = db.client.table('processed_content').select(
-            'id, title, content_type, quality_score, key_topics, visit_timestamp, processing_method, embedding'
-        ).gte('visit_timestamp', start_date.isoformat()).execute()
-        
-        content_data = response.data or []
-        
-        if not content_data:
-            return {
-                "period": f"{days} days",
-                "total_content": 0,
-                "analytics": {},
-                "trends": {},
-                "insights": []
-            }
-        
-        # Basic statistics
-        total_content = len(content_data)
-        avg_quality = sum(item.get('quality_score', 0) for item in content_data) / total_content
-        
-        # Content type distribution
-        content_types = Counter(item.get('content_type', 'Unknown') for item in content_data)
-        
-        # Processing method distribution
-        processing_methods = Counter(item.get('processing_method', 'unknown') for item in content_data)
-        
-        # Quality distribution
-        quality_scores = [item.get('quality_score', 0) for item in content_data]
-        quality_distribution = {
-            "excellent": len([q for q in quality_scores if q >= 8]),
-            "good": len([q for q in quality_scores if 6 <= q < 8]),
-            "average": len([q for q in quality_scores if 4 <= q < 6]),
-            "poor": len([q for q in quality_scores if q < 4])
-        }
-        
-        # Topic frequency
-        all_topics = []
-        for item in content_data:
-            if item.get('key_topics'):
-                all_topics.extend(item['key_topics'])
-        topic_frequency = dict(Counter(all_topics).most_common(20))
-        
-        # Temporal trends
-        trends = {}
-        if include_trends:
-            daily_counts = defaultdict(int)
-            daily_quality = defaultdict(list)
-            
-            for item in content_data:
-                if item.get('visit_timestamp'):
-                    date = datetime.fromisoformat(item['visit_timestamp']).date()
-                    daily_counts[date.isoformat()] += 1
-                    daily_quality[date.isoformat()].append(item.get('quality_score', 0))
-            
-            trends = {
-                "daily_content": dict(daily_counts),
-                "daily_avg_quality": {
-                    date: sum(scores) / len(scores) if scores else 0
-                    for date, scores in daily_quality.items()
-                }
-            }
-        
-        # Learning velocity
-        recent_week = [item for item in content_data 
-                      if datetime.fromisoformat(item['visit_timestamp']) > end_date - timedelta(days=7)]
-        previous_week = [item for item in content_data 
-                        if end_date - timedelta(days=14) < datetime.fromisoformat(item['visit_timestamp']) <= end_date - timedelta(days=7)]
-        
-        learning_velocity = {
-            "recent_week_count": len(recent_week),
-            "previous_week_count": len(previous_week),
-            "growth_rate": ((len(recent_week) - len(previous_week)) / max(len(previous_week), 1)) * 100 if previous_week else 0
-        }
-        
-        # Generate insights
-        insights = []
-        
-        if learning_velocity["growth_rate"] > 20:
-            insights.append("🚀 Your learning pace has increased significantly this week!")
-        elif learning_velocity["growth_rate"] < -20:
-            insights.append("📉 Your content consumption has decreased this week.")
-        
-        if avg_quality > 7:
-            insights.append("⭐ You're consistently finding high-quality content!")
-        
-        most_common_type = content_types.most_common(1)[0] if content_types else ("Unknown", 0)
-        if most_common_type[1] > total_content * 0.5:
-            insights.append(f"📚 You're focused heavily on {most_common_type[0]} content.")
-        
-        if len(set(all_topics)) > 20:
-            insights.append("🌐 You're exploring a diverse range of topics!")
-        
-        return {
-            "period": f"{days} days",
-            "total_content": total_content,
-            "analytics": {
-                "average_quality": round(avg_quality, 2),
-                "content_types": dict(content_types),
-                "processing_methods": dict(processing_methods),
-                "quality_distribution": quality_distribution,
-                "topic_frequency": topic_frequency,
-                "learning_velocity": learning_velocity
-            },
-            "trends": trends,
-            "insights": insights,
-            "generated_at": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Advanced analytics failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/clustering/advanced")
-async def perform_advanced_clustering(
-    method: str = "dbscan",
-    min_cluster_size: int = 3,
-    eps: float = 0.3,
-    include_embeddings: bool = True
-):
-    """Perform advanced clustering using machine learning algorithms"""
-    try:
-        # Get content with embeddings
-        response = db.client.table('processed_content').select(
-            'id, title, summary, content_type, key_topics, quality_score, embedding'
-        ).execute()
-        
-        content_data = response.data or []
-        
-        if len(content_data) < min_cluster_size:
-            return {
-                "clusters": [],
-                "method": method,
-                "total_items": len(content_data),
-                "message": f"Not enough content for clustering (minimum: {min_cluster_size})"
-            }
-        
-        # Prepare data for clustering
-        embeddings = []
-        items = []
-        
-        for item in content_data:
-            if item.get('embedding') and include_embeddings:
-                embeddings.append(item['embedding'])
-                items.append(item)
-        
-        if len(embeddings) < min_cluster_size:
-            return {
-                "clusters": [],
-                "method": method,
-                "total_items": len(content_data),
-                "message": "Not enough items with embeddings for clustering"
-            }
-        
-        embeddings_array = np.array(embeddings)
-        
-        # Perform clustering
-        if method == "dbscan":
-            clustering = DBSCAN(eps=eps, min_samples=min_cluster_size, metric='cosine')
-            cluster_labels = clustering.fit_predict(embeddings_array)
-        else:
-            raise ValueError(f"Unsupported clustering method: {method}")
-        
-        # Group items by cluster
-        clusters = defaultdict(list)
-        for item, label in zip(items, cluster_labels):
-            if label != -1:  # -1 is noise in DBSCAN
-                clusters[int(label)].append(item)
-        
-        # Format clusters
-        formatted_clusters = []
-        for cluster_id, cluster_items in clusters.items():
-            if len(cluster_items) >= min_cluster_size:
-                # Analyze cluster characteristics
-                content_types = Counter(item.get('content_type', 'Unknown') for item in cluster_items)
-                all_topics = []
-                for item in cluster_items:
-                    if item.get('key_topics'):
-                        all_topics.extend(item['key_topics'])
-                
-                common_topics = [topic for topic, count in Counter(all_topics).most_common(5)]
-                avg_quality = sum(item.get('quality_score', 0) for item in cluster_items) / len(cluster_items)
-                
-                # Generate cluster name
-                most_common_type = content_types.most_common(1)[0][0] if content_types else "Mixed"
-                primary_topic = common_topics[0] if common_topics else "General"
-                cluster_name = f"{most_common_type} - {primary_topic}"
-                
-                formatted_clusters.append({
-                    "id": cluster_id,
-                    "name": cluster_name,
-                    "description": f"Cluster of {len(cluster_items)} items focused on {primary_topic}",
-                    "size": len(cluster_items),
-                    "items": [
-                        {
-                            "id": item['id'],
-                            "title": item.get('title', 'Untitled'),
-                            "content_type": item.get('content_type', 'Unknown'),
-                            "quality_score": item.get('quality_score', 0)
-                        }
-                        for item in cluster_items
-                    ],
-                    "characteristics": {
-                        "content_types": dict(content_types),
-                        "common_topics": common_topics,
-                        "average_quality": round(avg_quality, 2),
-                        "quality_range": [
-                            min(item.get('quality_score', 0) for item in cluster_items),
-                            max(item.get('quality_score', 0) for item in cluster_items)
-                        ]
-                    }
-                })
-        
-        # Sort clusters by size
-        formatted_clusters.sort(key=lambda x: x['size'], reverse=True)
-        
-        return {
-            "clusters": formatted_clusters,
-            "method": method,
-            "parameters": {
-                "eps": eps,
-                "min_cluster_size": min_cluster_size
-            },
-            "total_items": len(content_data),
-            "clustered_items": sum(len(cluster["items"]) for cluster in formatted_clusters),
-            "noise_items": len(items) - sum(len(cluster["items"]) for cluster in formatted_clusters),
-            "generated_at": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Advanced clustering failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/recommendations/personalized")
-async def get_personalized_recommendations(
-    user_interests: Optional[str] = None,
-    content_types: Optional[str] = None,
-    min_quality: int = 6,
-    limit: int = 10,
-    diversity_factor: float = 0.3
-):
-    """Get personalized content recommendations"""
-    try:
-        # Parse parameters
-        interest_topics = user_interests.split(',') if user_interests else []
-        allowed_types = content_types.split(',') if content_types else []
-        
-        # Get all content
-        response = db.client.table('processed_content').select(
-            'id, title, summary, content_type, key_topics, quality_score, url, embedding'
-        ).gte('quality_score', min_quality).execute()
-        
-        content_data = response.data or []
-        
-        if not content_data:
-            return {
-                "recommendations": [],
-                "total_available": 0,
-                "method": "personalized",
-                "parameters": {
-                    "min_quality": min_quality,
-                    "diversity_factor": diversity_factor
-                }
-            }
-        
-        # Filter by content type if specified
-        if allowed_types:
-            content_data = [item for item in content_data 
-                          if item.get('content_type') in allowed_types]
-        
-        # Calculate recommendation scores
-        recommendations = []
-        
-        for item in content_data:
-            score = item.get('quality_score', 0) * 0.4  # Base quality score
-            
-            # Interest alignment
-            item_topics = item.get('key_topics', [])
-            if interest_topics and item_topics:
-                topic_overlap = len(set(interest_topics) & set(item_topics))
-                score += topic_overlap * 2  # Bonus for topic relevance
-            
-            # Content type preference (if specified)
-            if allowed_types and item.get('content_type') in allowed_types:
-                score += 1
-            
-            # Recency bonus (newer content gets slight preference)
-            if item.get('visit_timestamp'):
-                days_old = (datetime.now() - datetime.fromisoformat(item['visit_timestamp'])).days
-                recency_bonus = max(0, 1 - (days_old / 30))  # Bonus decreases over 30 days
-                score += recency_bonus
-            
-            recommendations.append({
-                "id": item['id'],
-                "title": item.get('title', 'Untitled'),
-                "summary": item.get('summary', ''),
-                "content_type": item.get('content_type', 'Unknown'),
-                "quality_score": item.get('quality_score', 0),
-                "url": item.get('url'),
-                "topics": item.get('key_topics', []),
-                "recommendation_score": round(score, 2),
-                "reasons": []
-            })
-        
-        # Sort by recommendation score
-        recommendations.sort(key=lambda x: x['recommendation_score'], reverse=True)
-        
-        # Apply diversity filter
-        if diversity_factor > 0:
-            diverse_recommendations = []
-            seen_types = set()
-            seen_topics = set()
-            
-            for rec in recommendations:
-                diversity_penalty = 0
-                
-                # Penalize repeated content types
-                if rec['content_type'] in seen_types:
-                    diversity_penalty += diversity_factor
-                
-                # Penalize repeated topics
-                topic_overlap = len(set(rec['topics']) & seen_topics)
-                diversity_penalty += topic_overlap * diversity_factor * 0.5
-                
-                rec['recommendation_score'] -= diversity_penalty
-                diverse_recommendations.append(rec)
-                
-                seen_types.add(rec['content_type'])
-                seen_topics.update(rec['topics'])
-            
-            recommendations = diverse_recommendations
-            recommendations.sort(key=lambda x: x['recommendation_score'], reverse=True)
-        
-        # Add recommendation reasons
-        for rec in recommendations[:limit]:
-            reasons = []
-            if rec['quality_score'] >= 8:
-                reasons.append("High quality content")
-            if interest_topics and set(interest_topics) & set(rec['topics']):
-                matching_topics = list(set(interest_topics) & set(rec['topics']))
-                reasons.append(f"Matches your interests: {', '.join(matching_topics)}")
-            if rec['content_type'] in allowed_types:
-                reasons.append(f"Preferred content type: {rec['content_type']}")
-            
-            rec['reasons'] = reasons
-        
-        return {
-            "recommendations": recommendations[:limit],
-            "total_available": len(content_data),
-            "method": "personalized",
-            "parameters": {
-                "user_interests": interest_topics,
-                "content_types": allowed_types,
-                "min_quality": min_quality,
-                "diversity_factor": diversity_factor
-            },
-            "generated_at": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Personalized recommendations failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/network/analysis")
-async def analyze_content_network():
-    """Analyze the content network structure"""
-    try:
-        # Get all content and relationships
-        content_response = db.client.table('processed_content').select(
-            'id, title, content_type, key_topics, quality_score'
-        ).execute()
-        
-        content_data = content_response.data or []
-        
-        if len(content_data) < 2:
-            return {
-                "network_stats": {},
-                "centrality_scores": {},
-                "communities": [],
-                "message": "Not enough content for network analysis"
-            }
-        
-        # Build adjacency matrix based on topic similarity
-        nodes = {item['id']: item for item in content_data}
-        edges = []
-        adjacency = defaultdict(list)
-        
-        for i, item1 in enumerate(content_data):
-            topics1 = set(item1.get('key_topics', []))
-            for j, item2 in enumerate(content_data[i+1:], i+1):
-                topics2 = set(item2.get('key_topics', []))
-                
-                # Calculate topic overlap
-                overlap = len(topics1 & topics2)
-                total_topics = len(topics1 | topics2)
-                
-                if overlap > 0 and total_topics > 0:
-                    similarity = overlap / total_topics
-                    if similarity >= 0.2:  # Minimum similarity threshold
-                        edges.append({
-                            "source": item1['id'],
-                            "target": item2['id'],
-                            "weight": similarity,
-                            "shared_topics": list(topics1 & topics2)
-                        })
-                        adjacency[item1['id']].append(item2['id'])
-                        adjacency[item2['id']].append(item1['id'])
-        
-        # Calculate network statistics
-        num_nodes = len(nodes)
-        num_edges = len(edges)
-        density = (2 * num_edges) / (num_nodes * (num_nodes - 1)) if num_nodes > 1 else 0
-        
-        # Calculate degree centrality
-        degree_centrality = {}
-        for node_id in nodes:
-            degree_centrality[node_id] = len(adjacency[node_id])
-        
-        # Find connected components
-        visited = set()
-        components = []
-        
-        def dfs(node_id, component):
-            if node_id in visited:
-                return
-            visited.add(node_id)
-            component.append(node_id)
-            for neighbor in adjacency[node_id]:
-                dfs(neighbor, component)
-        
-        for node_id in nodes:
-            if node_id not in visited:
-                component = []
-                dfs(node_id, component)
-                if component:
-                    components.append(component)
-        
-        # Find communities (simple modularity-based)
-        communities = []
-        for i, component in enumerate(components):
-            if len(component) >= 3:  # Minimum community size
-                community_nodes = [nodes[node_id] for node_id in component]
-                
-                # Analyze community characteristics
-                content_types = Counter(node.get('content_type', 'Unknown') for node in community_nodes)
-                all_topics = []
-                for node in community_nodes:
-                    if node.get('key_topics'):
-                        all_topics.extend(node['key_topics'])
-                
-                common_topics = [topic for topic, count in Counter(all_topics).most_common(3)]
-                avg_quality = sum(node.get('quality_score', 0) for node in community_nodes) / len(community_nodes)
-                
-                communities.append({
-                    "id": i,
-                    "name": f"Community {i + 1}",
-                    "size": len(component),
-                    "nodes": component,
-                    "characteristics": {
-                        "content_types": dict(content_types),
-                        "common_topics": common_topics,
-                        "average_quality": round(avg_quality, 2)
-                    }
-                })
-        
-        # Top central nodes
-        top_central_nodes = sorted(
-            degree_centrality.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:10]
-        
-        return {
-            "network_stats": {
-                "num_nodes": num_nodes,
-                "num_edges": num_edges,
-                "density": round(density, 4),
-                "num_components": len(components),
-                "largest_component": max(len(comp) for comp in components) if components else 0,
-                "average_degree": round(sum(degree_centrality.values()) / len(degree_centrality), 2) if degree_centrality else 0
-            },
-            "centrality_scores": {
-                str(node_id): score for node_id, score in top_central_nodes
-            },
-            "communities": communities,
-            "edges": edges[:100],  # Limit for performance
-            "generated_at": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Network analysis failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/export/formats")
-async def export_in_multiple_formats(
-    format_type: str = "json",
-    include_embeddings: bool = False,
-    include_content: bool = False
-):
-    """Export data in various formats (JSON, CSV, GraphML, etc.)"""
-    try:
-        # Select fields based on parameters
-        fields = 'id, url, title, summary, content_type, key_topics, quality_score, processing_method, visit_timestamp'
-        
-        if include_embeddings:
-            fields += ', embedding'
-        if include_content:
-            fields += ', content'
-        
-        response = db.client.table('processed_content').select(fields).execute()
-        data = response.data or []
-        
-        if format_type == "json":
-            export_data = {
-                "version": "2.0.0",
-                "exported_at": datetime.now().isoformat(),
-                "total_items": len(data),
-                "includes_embeddings": include_embeddings,
-                "includes_content": include_content,
-                "items": data
-            }
-            return export_data
-            
-        elif format_type == "csv":
-            # Convert to CSV-friendly format
-            csv_data = []
-            for item in data:
-                csv_row = {
-                    "id": item['id'],
-                    "url": item.get('url', ''),
-                    "title": item.get('title', ''),
-                    "summary": item.get('summary', ''),
-                    "content_type": item.get('content_type', ''),
-                    "topics": '; '.join(item.get('key_topics', [])),
-                    "quality_score": item.get('quality_score', 0),
-                    "processing_method": item.get('processing_method', ''),
-                    "visit_timestamp": item.get('visit_timestamp', '')
-                }
-                
-                if include_content:
-                    csv_row["content"] = item.get('content', '')
-                
-                csv_data.append(csv_row)
-            
-            return {
-                "format": "csv",
-                "data": csv_data,
-                "exported_at": datetime.now().isoformat()
-            }
-            
-        elif format_type == "graphml":
-            # Create GraphML structure
-            nodes = []
-            edges = []
-            
-            # Process nodes
-            for item in data:
-                nodes.append({
-                    "id": str(item['id']),
-                    "title": item.get('title', ''),
-                    "type": item.get('content_type', ''),
-                    "quality": item.get('quality_score', 0),
-                    "url": item.get('url', '')
-                })
-            
-            # Create edges based on topic similarity
-            for i, item1 in enumerate(data):
-                topics1 = set(item1.get('key_topics', []))
-                for j, item2 in enumerate(data[i+1:], i+1):
-                    topics2 = set(item2.get('key_topics', []))
-                    
-                    overlap = len(topics1 & topics2)
-                    if overlap > 0:
-                        edges.append({
-                            "source": str(item1['id']),
-                            "target": str(item2['id']),
-                            "weight": overlap,
-                            "shared_topics": list(topics1 & topics2)
-                        })
-            
-            return {
-                "format": "graphml",
-                "nodes": nodes,
-                "edges": edges,
-                "metadata": {
-                    "exported_at": datetime.now().isoformat(),
-                    "total_nodes": len(nodes),
-                    "total_edges": len(edges)
-                }
-            }
-            
-        else:
-            raise ValueError(f"Unsupported export format: {format_type}")
-            
-    except Exception as e:
-        logger.error(f"Export failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-    
 @app.get("/api/stats")
 async def get_stats():
     """Get processing statistics"""
@@ -1366,23 +819,33 @@ async def health_check():
             "timestamp": datetime.now().isoformat()
         }
 
+# Mount static files for frontend
+try:
+    app.mount("/static", StaticFiles(directory="frontend/build"), name="static")
+    logger.info("✅ Static files mounted")
+except Exception as e:
+    logger.warning(f"⚠️ Static files not mounted: {e}")
+
 @app.get("/")
 async def root():
     return {
-        "message": "MindCanvas - Simple AI Knowledge Graph",
+        "message": "MindCanvas - AI Knowledge Graph with RAG Chatbot",
         "version": "1.0",
         "features": [
             "vector_search",
             "content_clustering", 
             "dual_llm_processing",
-            "supabase_database"
+            "supabase_database",
+            "rag_chatbot"
         ],
         "endpoints": {
             "ingest": "POST /api/ingest",
             "search": "POST /api/search/semantic",
             "content": "GET /api/content",
-            "dashboard": "GET /static/index.html"
-        }
+            "chat": "POST /api/chat",
+            "chat_health": "GET /api/chat/health"
+        },
+        "chat_status": "available" if rag_chatbot else "unavailable"
     }
 
 if __name__ == "__main__":

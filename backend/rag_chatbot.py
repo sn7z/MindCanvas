@@ -1,21 +1,26 @@
 """
 RAG-based Chatbot Backend for MindCanvas
-Implements intelligent Q&A using knowledge graph content
+Implements intelligent Q&A using knowledge graph content with LangChain
 """
 
 import asyncio
 import json
 import logging
+import time
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from dataclasses import dataclass
 
 from fastapi import HTTPException
-from pydantic import BaseModel
-from openai import OpenAI
-from groq import Groq
+from pydantic import BaseModel, Field
+
+# FIXED: Updated imports for newer LangChain packages
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain.schema import AIMessage, HumanMessage, SystemMessage
+from langchain.memory import ConversationBufferMemory
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.chains import ConversationalRetrievalChain
 import numpy as np
-from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +36,7 @@ class ChatRequest(BaseModel):
     use_rag: bool = True
     max_context_items: int = 5
     similarity_threshold: float = 0.3
+    conversation_id: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -39,6 +45,14 @@ class ChatResponse(BaseModel):
     processing_time: float = 0.0
     tokens_used: int = 0
     conversation_id: str = ""
+
+class SourceCitation(BaseModel):
+    title: str
+    url: str
+    content_type: str = Field(default="")
+    quality_score: float = Field(default=0.0)
+    similarity: float = Field(default=0.0)
+    summary: str = Field(default="")
 
 @dataclass
 class KnowledgeContext:
@@ -53,9 +67,19 @@ class KnowledgeContext:
 class RAGChatbot:
     def __init__(self, db, openai_key: str = None, groq_key: str = None):
         self.db = db
-        self.openai_client = OpenAI(api_key=openai_key) if openai_key else None
-        self.groq_client = Groq(api_key=groq_key) if groq_key else None
-        self.embedder = SentenceTransformer('all-MiniLM-L6-v2')
+        self.client = db.client
+        self.openai_api_key = openai_key
+        
+        # Initialize LangChain components
+        self.embeddings = OpenAIEmbeddings(openai_api_key=openai_key)
+        self.llm = ChatOpenAI(
+            model_name="gpt-3.5-turbo",  # Use a less expensive model by default
+            temperature=0.3,
+            openai_api_key=openai_key
+        )
+        
+        # Initialize vector store - will do this manually instead of using LangChain's integration
+        self.vector_store = None
         
         # System prompts
         self.system_prompt = """You are MindCanvas AI, an intelligent knowledge assistant that helps users explore and understand their personal knowledge graph.
@@ -68,7 +92,7 @@ Your capabilities:
 - Help with research and knowledge discovery
 
 Guidelines:
-- Always cite sources when providing information
+- Always cite sources when providing information using format [Source: Title]
 - Be conversational but precise
 - If information is not in the knowledge base, clearly state this
 - Suggest related topics when appropriate
@@ -81,7 +105,7 @@ Context: You have access to the user's processed web content including summaries
 
 IMPORTANT RULES:
 1. Only use information from the provided context
-2. Always cite sources with [Source: Title/URL]
+2. Always cite sources with [Source: Title]
 3. If the context doesn't contain enough information, say so clearly
 4. Connect related concepts when possible
 5. Provide practical insights and actionable advice
@@ -89,28 +113,63 @@ IMPORTANT RULES:
 
 The context includes content the user has previously browsed, with summaries and quality ratings."""
 
+        self.conversation_memories = {}
+
     async def process_chat_request(self, request: ChatRequest) -> ChatResponse:
-        """Main chat processing pipeline"""
+        """Main chat processing pipeline with LangChain"""
         start_time = datetime.now()
         
         try:
-            # Step 1: Retrieve relevant context
+            # Get or create conversation memory
+            conversation_id = request.conversation_id or f"chat_{int(datetime.now().timestamp())}"
+            if conversation_id not in self.conversation_memories:
+                self.conversation_memories[conversation_id] = ConversationBufferMemory(
+                    memory_key="chat_history",
+                    return_messages=True
+                )
+            
+            memory = self.conversation_memories[conversation_id]
+            
+            # Convert conversation history to LangChain format if it exists
+            if request.conversation_history:
+                # Clear existing memory to avoid duplicates
+                if hasattr(memory, 'clear'):
+                    memory.clear()
+                
+                # Add history messages to memory
+                for msg in request.conversation_history:
+                    if msg.role == "user":
+                        memory.chat_memory.add_user_message(msg.content)
+                    elif msg.role == "assistant":
+                        memory.chat_memory.add_ai_message(msg.content)
+                    elif msg.role == "system":
+                        # System messages are handled differently
+                        pass
+            
+            # Step 1: Retrieve relevant context if RAG is enabled
             context_items = []
             sources = []
             
             if request.use_rag:
-                context_items = await self._retrieve_relevant_context(
+                # Use direct DB search since vector store isn't working
+                docs = await self._retrieve_relevant_context(
                     request.message, 
                     request.max_context_items,
                     request.similarity_threshold
                 )
-                sources = [self._format_source(item) for item in context_items]
+                
+                if docs:
+                    # Convert to KnowledgeContext format for consistency
+                    context_items = docs
+                    
+                    # Format sources for the response
+                    sources = [self._format_source(item) for item in context_items]
             
             # Step 2: Generate response
             response_text, tokens_used, confidence = await self._generate_response(
                 request.message,
                 context_items,
-                request.conversation_history
+                memory
             )
             
             # Step 3: Calculate processing time
@@ -122,117 +181,114 @@ The context includes content the user has previously browsed, with summaries and
                 confidence=confidence,
                 processing_time=processing_time,
                 tokens_used=tokens_used,
-                conversation_id=f"chat_{int(datetime.now().timestamp())}"
+                conversation_id=conversation_id
             )
             
         except Exception as e:
-            logger.error(f"Chat processing failed: {e}")
+            logger.error(f"Chat processing failed: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Chat processing failed: {str(e)}")
 
     async def _retrieve_relevant_context(self, query: str, max_items: int, threshold: float) -> List[KnowledgeContext]:
-        """Retrieve relevant content using vector similarity"""
+        """Retrieve relevant content using vector similarity - directly from DB"""
         try:
-            # Generate query embedding
-            query_embedding = self.embedder.encode(query).tolist()
+            # Generate query embedding using our database helper
+            query_embedding = await self.db.generate_embedding(query, use_openai=True)
             
-            # Get all content with embeddings
-            response = self.db.client.table('processed_content').select(
-                'id, url, title, summary, content, content_type, quality_score, embedding'
-            ).execute()
+            # Use direct DB search from our helper
+            results = await self.db.semantic_search(query, max_items, threshold)
             
-            if not response.data:
+            if not results:
+                logger.info(f"No relevant context found for query: {query}")
                 return []
             
-            # Calculate similarities and filter
+            # Convert to KnowledgeContext objects
             context_items = []
-            for item in response.data:
-                if not item.get('embedding'):
-                    continue
+            for result in results:
+                # Get full content for the item
+                content_response = self.db.client.table('processed_content').select(
+                    'content'
+                ).eq('id', result['id']).execute()
                 
-                similarity = self._cosine_similarity(query_embedding, item['embedding'])
+                content = ""
+                if content_response.data and len(content_response.data) > 0:
+                    content = content_response.data[0].get('content', "")
                 
-                if similarity >= threshold:
-                    context_items.append(KnowledgeContext(
-                        content=item['content'][:1500],  # Limit content length
-                        title=item['title'],
-                        url=item['url'],
-                        content_type=item['content_type'],
-                        quality_score=item['quality_score'],
-                        similarity=similarity,
-                        summary=item['summary']
-                    ))
+                # Create KnowledgeContext object
+                context_item = KnowledgeContext(
+                    content=content,
+                    title=result['title'],
+                    url=result['url'],
+                    content_type=result['content_type'],
+                    quality_score=result['quality_score'],
+                    similarity=result['similarity'],
+                    summary=result['summary']
+                )
+                context_items.append(context_item)
             
-            # Sort by similarity and quality, return top results
-            context_items.sort(key=lambda x: (x.similarity * 0.7 + x.quality_score * 0.3), reverse=True)
-            return context_items[:max_items]
+            logger.info(f"Retrieved {len(context_items)} relevant context items")
+            return context_items
             
         except Exception as e:
-            logger.error(f"Context retrieval failed: {e}")
+            logger.error(f"Context retrieval failed: {e}", exc_info=True)
             return []
 
     async def _generate_response(self, query: str, context_items: List[KnowledgeContext], 
-                               history: List[ChatMessage]) -> tuple[str, int, float]:
-        """Generate response using LLM with RAG context"""
+                               memory: ConversationBufferMemory) -> tuple[str, int, float]:
+        """Generate response using LangChain with RAG context"""
         
-        # Build context string
-        context_str = self._build_context_string(context_items)
-        
-        # Build conversation history
-        messages = [{"role": "system", "content": self.rag_system_prompt if context_items else self.system_prompt}]
-        
-        # Add conversation history
-        for msg in history[-6:]:  # Last 6 messages for context
-            messages.append({"role": msg.role, "content": msg.content})
-        
-        # Add current query with context
-        if context_items:
-            user_message = f"Context from my knowledge base:\n{context_str}\n\nQuestion: {query}"
-        else:
-            user_message = f"Question: {query}\n\nNote: I don't have specific content in my knowledge base related to this question. Please provide general guidance or let me know if you'd like me to search for something specific."
-        
-        messages.append({"role": "user", "content": user_message})
-        
-        # Try Groq first (faster), fallback to OpenAI
-        try:
-            if self.groq_client:
-                response = self.groq_client.chat.completions.create(
-                    model="llama-3.1-70b-versatile",
-                    messages=messages,
-                    max_tokens=1000,
-                    temperature=0.3,
-                    stream=False
-                )
-                
-                response_text = response.choices[0].message.content
-                tokens_used = response.usage.total_tokens if response.usage else 0
-                confidence = self._calculate_confidence(context_items, response_text)
-                
-                return response_text, tokens_used, confidence
-                
-        except Exception as e:
-            logger.warning(f"Groq failed, trying OpenAI: {e}")
-        
-        # Fallback to OpenAI
-        if self.openai_client:
+        if not context_items:
+            # No context available, use simple chat completion
+            messages = [
+                SystemMessage(content=self.system_prompt),
+                HumanMessage(content=f"Question: {query}\n\nNote: I don't have specific content in my knowledge base related to this question.")
+            ]
+            
             try:
-                response = self.openai_client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=messages,
-                    max_tokens=1000,
-                    temperature=0.3
-                )
-                
-                response_text = response.choices[0].message.content
-                tokens_used = response.usage.total_tokens
-                confidence = self._calculate_confidence(context_items, response_text)
+                response = await self.llm.ainvoke(messages)
+                response_text = response.content
+                tokens_used = getattr(response, 'usage', {}).get('total_tokens', 0)
+                confidence = 0.3  # Lower confidence without context
                 
                 return response_text, tokens_used, confidence
-                
             except Exception as e:
-                logger.error(f"OpenAI also failed: {e}")
+                logger.error(f"Chat completion failed: {e}", exc_info=True)
+                return self._generate_fallback_response(query, []), 0, 0.1
         
-        # Fallback response
-        return self._generate_fallback_response(query, context_items), 0, 0.3
+        # Use direct LLM call with context for RAG
+        try:
+            # Create context string
+            context_str = self._build_context_string(context_items)
+            
+            # Build message history
+            chat_history = memory.chat_memory.messages
+            
+            # Create messages for context and query
+            messages = [
+                SystemMessage(content=self.rag_system_prompt),
+                *chat_history,
+                HumanMessage(content=f"Context from my knowledge base:\n{context_str}\n\nQuestion: {query}")
+            ]
+            
+            # Generate response
+            response = await self.llm.ainvoke(messages)
+            response_text = response.content
+            
+            # Get token usage if available
+            tokens_used = getattr(response, 'usage', {}).get('total_tokens', 0) or 0
+            
+            # Calculate confidence based on context quality
+            confidence = self._calculate_confidence(context_items, response_text)
+            
+            # Add to memory
+            memory.chat_memory.add_user_message(query)
+            memory.chat_memory.add_ai_message(response_text)
+            
+            return response_text, tokens_used, confidence
+            
+        except Exception as e:
+            logger.error(f"RAG response generation failed: {e}", exc_info=True)
+            # Fallback to simple response
+            return self._generate_fallback_response(query, context_items), 0, 0.2
 
     def _build_context_string(self, context_items: List[KnowledgeContext]) -> str:
         """Build formatted context string for LLM"""
@@ -301,29 +357,11 @@ Is there a specific aspect of this topic you'd like me to help you explore?"""
             "summary": context_item.summary[:200] + "..." if len(context_item.summary) > 200 else context_item.summary
         }
 
-    def _cosine_similarity(self, a: List[float], b: List[float]) -> float:
-        """Calculate cosine similarity between two vectors"""
-        try:
-            vec_a = np.array(a)
-            vec_b = np.array(b)
-            
-            dot_product = np.dot(vec_a, vec_b)
-            norm_a = np.linalg.norm(vec_a)
-            norm_b = np.linalg.norm(vec_b)
-            
-            if norm_a == 0 or norm_b == 0:
-                return 0.0
-            
-            return dot_product / (norm_a * norm_b)
-            
-        except Exception:
-            return 0.0
-
     async def get_suggested_questions(self, limit: int = 5) -> List[str]:
         """Generate suggested questions based on knowledge base content"""
         try:
             # Get recent and high-quality content
-            response = self.db.client.table('processed_content').select(
+            response = self.client.table('processed_content').select(
                 'title, summary, content_type, key_topics'
             ).gte('quality_score', 7).order('quality_score', desc=True).limit(20).execute()
             

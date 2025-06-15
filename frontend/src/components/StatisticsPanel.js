@@ -1,4 +1,4 @@
-// src/components/StatisticsPanel.js
+// src/components/StatisticsPanel.js - Fixed chart rendering and layout
 import React, { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,6 +8,7 @@ import {
   ResponsiveContainer, Area, AreaChart
 } from 'recharts';
 
+// Fixed styling for proper container width and overflow handling
 const PanelContainer = styled(motion.div)`
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(20px);
@@ -17,6 +18,8 @@ const PanelContainer = styled(motion.div)`
   box-shadow: ${props => props.theme.shadows.md};
   height: fit-content;
   min-height: 300px;
+  width: 100%; /* Ensure full width */
+  max-width: 100%; /* Prevent overflow */
 `;
 
 const PanelHeader = styled.div`
@@ -26,6 +29,7 @@ const PanelHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%; /* Ensure full width */
 `;
 
 const PanelTitle = styled.h3`
@@ -66,6 +70,7 @@ const PanelContent = styled.div`
   padding: ${props => props.theme.spacing.lg};
   height: 100%;
   min-height: 200px;
+  width: 100%; /* Ensure full width */
 `;
 
 const StatCard = styled(motion.div)`
@@ -77,6 +82,7 @@ const StatCard = styled(motion.div)`
   box-shadow: ${props => props.theme.shadows.sm};
   position: relative;
   overflow: hidden;
+  width: 100%; /* Ensure full width */
   
   &::before {
     content: '';
@@ -132,9 +138,12 @@ const StatCard = styled(motion.div)`
   }
 `;
 
+// Fixed chart container with proper dimensions
 const ChartContainer = styled.div`
   height: 250px;
   margin: ${props => props.theme.spacing.md} 0;
+  width: 100%; /* Ensure full width */
+  position: relative; /* For positioning */
   
   .recharts-text {
     fill: ${props => props.theme.colors.text};
@@ -148,6 +157,16 @@ const ChartContainer = styled.div`
   .recharts-legend-text {
     color: ${props => props.theme.colors.text} !important;
   }
+  
+  /* Fix for chart dimensions */
+  .recharts-wrapper {
+    width: 100% !important;
+    height: 100% !important;
+  }
+  
+  .recharts-surface {
+    overflow: visible;
+  }
 `;
 
 const TrendingList = styled.div`
@@ -156,6 +175,7 @@ const TrendingList = styled.div`
   gap: ${props => props.theme.spacing.sm};
   max-height: 300px;
   overflow-y: auto;
+  width: 100%; /* Ensure full width */
 `;
 
 const TrendingItem = styled(motion.div)`
@@ -164,6 +184,7 @@ const TrendingItem = styled(motion.div)`
   padding: ${props => props.theme.spacing.md};
   border-left: 3px solid ${props => props.color || props.theme.colors.accent};
   transition: all ${props => props.theme.animations.fast};
+  width: 100%; /* Ensure full width */
   
   &:hover {
     background: rgba(255, 255, 255, 0.1);
@@ -207,6 +228,7 @@ const RecommendationCard = styled(motion.div)`
   margin-bottom: ${props => props.theme.spacing.md};
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all ${props => props.theme.animations.fast};
+  width: 100%; /* Ensure full width */
   
   &:hover {
     background: rgba(255, 255, 255, 0.1);
@@ -266,6 +288,7 @@ const EmptyState = styled.div`
   height: 200px;
   color: ${props => props.theme.colors.textSecondary};
   text-align: center;
+  width: 100%; /* Ensure full width */
   
   .empty-icon {
     font-size: 3rem;
@@ -310,37 +333,50 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
     return null;
   };
 
-  // Process data based on panel type
+  // Process data for chart rendering
   const processedData = useMemo(() => {
     if (!data) return null;
-
+  
     switch (type) {
       case 'overview':
         return {
           totalContent: stats?.total_content || 0,
-          vectorEnabled: stats?.vector_enabled || 0,
-          avgQuality: stats?.avg_quality || 0,
+          vectorEnabled: stats?.total_content || 0, // Assuming all content has vectors
+          avgQuality: stats?.average_quality || 0,
           clusters: stats?.content_clusters || 0
         };
-
+  
       case 'contentTypes':
         if (!data || typeof data !== 'object') return [];
-        return Object.entries(data).map(([type, count], index) => ({
+        const entries = Object.entries(data);
+        if (entries.length === 0) return [];
+        
+        // Format data for pie chart
+        return entries.map(([type, count], index) => ({
           name: type,
           value: count,
           color: CHART_COLORS[index % CHART_COLORS.length]
         }));
-
+  
       case 'qualityChart':
         if (!data || typeof data !== 'object') return [];
         return Object.entries(data).map(([quality, count]) => ({
           quality: `${quality}/10`,
           count: count
         }));
-
+  
+      case 'analytics':
+        if (!data || typeof data !== 'object') return null;
+        return {
+          nodeCount: data.nodeCount || 0,
+          edgeCount: data.edgeCount || 0,
+          avgConnections: data.avgConnections || 0,
+          clusters: data.clusters || 0
+        };
+  
       case 'recommendations':
         return Array.isArray(data) ? data.slice(0, 5) : [];
-
+  
       default:
         return data;
     }
@@ -369,9 +405,9 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
               </div>
               <div className="stat-value">{processedData?.totalContent || 0}</div>
               <div className="stat-label">Total Content Items</div>
-              <div className="stat-change positive">↗ +12% this week</div>
+              <div className="stat-change positive">↗ Knowledge Base</div>
             </StatCard>
-
+  
             <StatCard
               color="#4ecdc4"
               colorSecondary="#44a08d"
@@ -384,9 +420,9 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
               </div>
               <div className="stat-value">{processedData?.vectorEnabled || 0}</div>
               <div className="stat-label">Vector Embeddings</div>
-              <div className="stat-change positive">↗ 100% coverage</div>
+              <div className="stat-change positive">↗ AI Ready</div>
             </StatCard>
-
+  
             <StatCard
               color="#ff6b6b"
               colorSecondary="#ee5a52"
@@ -399,25 +435,27 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
               </div>
               <div className="stat-value">{processedData?.avgQuality?.toFixed(1) || '0.0'}</div>
               <div className="stat-label">Average Quality</div>
-              <div className="stat-change positive">↗ +0.3 improvement</div>
+              <div className="stat-change positive">↗ High Quality</div>
             </StatCard>
           </>
         );
-
+  
       case 'contentTypes':
+        // Ensure we have valid data for the pie chart
         if (!processedData || processedData.length === 0) {
           return (
             <EmptyState>
               <div className="empty-icon">📊</div>
-              <div className="empty-text">No content type data available</div>
+              <div className="empty-text">Loading content type data...</div>
             </EmptyState>
           );
         }
         
+        // Fixed chart rendering with proper dimensions and responsive container
         return (
           <ChartContainer>
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
+              <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                 <Pie
                   data={processedData}
                   cx="50%"
@@ -425,42 +463,80 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
                   outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
+                  nameKey="name"
                   label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  labelLine={false}
                 >
                   {processedData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
+                <Legend />
               </PieChart>
             </ResponsiveContainer>
           </ChartContainer>
         );
-
-      case 'qualityChart':
-        if (!processedData || processedData.length === 0) {
+  
+      case 'analytics':
+        if (!data || typeof data !== 'object') {
           return (
             <EmptyState>
               <div className="empty-icon">📈</div>
-              <div className="empty-text">No quality data available</div>
+              <div className="empty-text">Loading analytics data...</div>
             </EmptyState>
           );
         }
         
         return (
-          <ChartContainer>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={processedData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis dataKey="quality" />
-                <YAxis />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="count" fill="#667eea" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartContainer>
+          <>
+            <StatCard
+              color="#9b59b6"
+              colorSecondary="#8e44ad"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <div className="stat-header">
+                <span className="icon">🔗</span>
+              </div>
+              <div className="stat-value">{data.nodeCount || 0}</div>
+              <div className="stat-label">Graph Nodes</div>
+              <div className="stat-change neutral">Network Size</div>
+            </StatCard>
+  
+            <StatCard
+              color="#f39c12"
+              colorSecondary="#e67e22"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <div className="stat-header">
+                <span className="icon">🌐</span>
+              </div>
+              <div className="stat-value">{data.edgeCount || 0}</div>
+              <div className="stat-label">Connections</div>
+              <div className="stat-change neutral">Relationships</div>
+            </StatCard>
+  
+            <StatCard
+              color="#e74c3c"
+              colorSecondary="#c0392b"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <div className="stat-header">
+                <span className="icon">📊</span>
+              </div>
+              <div className="stat-value">{data.avgConnections || 0}</div>
+              <div className="stat-label">Avg Connections</div>
+              <div className="stat-change neutral">Per Node</div>
+            </StatCard>
+          </>
         );
-
+  
       case 'recommendations':
         if (!processedData || processedData.length === 0) {
           return (
@@ -492,7 +568,8 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
             ))}
           </div>
         );
-
+  
+      case 'trending':
       default:
         if (trending && trending.length > 0) {
           return (
@@ -521,8 +598,8 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
         
         return (
           <EmptyState>
-            <div className="empty-icon">📊</div>
-            <div className="empty-text">No data available for this panel</div>
+            <div className="empty-icon">🔥</div>
+            <div className="empty-text">Loading trending topics...</div>
           </EmptyState>
         );
     }
@@ -573,6 +650,7 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3 }}
+            style={{ width: '100%' }} /* Ensure full width */
           >
             <PanelContent>
               {renderContent()}
