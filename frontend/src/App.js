@@ -1,4 +1,4 @@
-// src/App.js - Final complete working implementation
+// src/App.js - Fixed layout with proper chatbot integration
 import React, { useState, useEffect } from 'react';
 import styled, { ThemeProvider, createGlobalStyle } from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -73,12 +73,13 @@ const GlobalStyle = createGlobalStyle`
     background: ${props => props.theme.colors.bg};
     color: ${props => props.theme.colors.text};
     height: 100%;
-    overflow: auto; /* Allow scrolling */
+    overflow: hidden;
   }
   
   #root {
-    min-height: 100vh;
+    height: 100vh;
     width: 100vw;
+    overflow: hidden;
   }
 
   ::-webkit-scrollbar {
@@ -103,9 +104,14 @@ const AppContainer = styled.div`
     "left-panel main-graph right-panel"
     "chatbot chatbot chatbot";
   grid-template-columns: 320px 1fr 320px;
-  grid-template-rows: minmax(600px, 1fr) 300px; /* Fixed chatbot height */
+  grid-template-rows: 1fr 300px;
   gap: ${props => props.theme.spacing.md};
   padding: ${props => props.theme.spacing.md};
+  overflow: hidden; /* Prevent page-level scrolling */
+  
+  @media (max-width: 1400px) {
+    grid-template-columns: 300px 1fr 300px;
+  }
   
   @media (max-width: 1200px) {
     grid-template-areas: 
@@ -114,7 +120,8 @@ const AppContainer = styled.div`
       "right-panel"
       "chatbot";
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(400px, 60vh) auto auto 300px;
+    grid-template-rows: 60vh auto auto 300px;
+    overflow-y: auto; /* Allow scrolling on mobile */
   }
 `;
 
@@ -157,19 +164,47 @@ const MainGraphArea = styled(motion.div)`
   position: relative;
   display: flex;
   flex-direction: column;
+  height: 100%;
   min-height: 600px;
+  
+  @media (max-width: 1200px) {
+    min-height: 50vh;
+    height: 60vh;
+  }
 `;
 
 const SidePanel = styled(motion.div)`
   display: flex;
   flex-direction: column;
   gap: ${props => props.theme.spacing.md};
-  max-height: 100vh;
+  height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: ${props => props.theme.spacing.xs}; /* Space for scrollbar */
+  
+  /* Custom scrollbar styling */
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+  }
+  
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
   
   @media (max-width: 1200px) {
-    max-height: none;
-    overflow-y: visible;
+    height: auto;
+    max-height: 70vh;
+    overflow-y: auto;
   }
 `;
 
@@ -181,8 +216,11 @@ const ChatbotArea = styled(motion.div)`
   border: 1px solid ${props => props.theme.colors.border};
   box-shadow: ${props => props.theme.shadows.md};
   overflow: hidden;
-  height: 300px; /* Fixed height for chatbot */
+  height: 300px;
+  min-height: 300px;
+  max-height: 300px;
 `;
+
 
 const ControlsPanel = styled(motion.div)`
   position: absolute;
@@ -787,7 +825,7 @@ const App = () => {
           )}
         </SidePanel>
 
-        {/* Chatbot Area */}
+        {/* Chatbot Area - Fixed positioning */}
         <ChatbotArea
           initial={{ y: 200, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}

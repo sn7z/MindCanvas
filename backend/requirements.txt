@@ -9,7 +9,10 @@ openai
 supabase
 uvicorn
 fastapi
-
+pip install langchain
+pip install langchain-openai
+pip install tiktoken
+pip install openai
 pip install fastapi uvicorn supabase sentence-transformers
 pip install openai groq beautifulsoup4 httpx pydantic
 pip install numpy scikit-learn python-multipart
