@@ -365,16 +365,6 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
           count: count
         }));
   
-      case 'graphAnalytics': // Changed from 'analytics'
-        if (!data || typeof data !== 'object') return { nodeCount: 0, edgeCount: 0, avgConnections: '0.0' };
-        const nodeCount = data.nodeCount || 0;
-        const edgeCount = data.edgeCount || 0;
-        return {
-          nodeCount: nodeCount,
-          edgeCount: edgeCount,
-          avgConnections: nodeCount > 0 ? (edgeCount / nodeCount).toFixed(1) : '0.0'
-        };
-  
       case 'recommendations':
         return Array.isArray(data) ? data.slice(0, 5) : [];
   
@@ -479,8 +469,7 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
           </ChartContainer>
         );
   
-      case 'analytics':
-      case 'graphAnalytics': // Changed from 'analytics'
+      case 'analytics': // Removed 'graphAnalytics'
         if (!processedData) {
           return (
             <EmptyState>
@@ -620,10 +609,9 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
           <span className="icon">
             {type === 'overview' && '📊'}
             {type === 'contentTypes' && '🎯'}
-            {type === 'graphAnalytics' && '📈'}
             {type === 'qualityChart' && '📈'}
             {type === 'recommendations' && '💡'}
-            {!['overview', 'contentTypes', 'graphAnalytics', 'qualityChart', 'recommendations'].includes(type) && '🔥'}
+            {!['overview', 'contentTypes', 'qualityChart', 'recommendations'].includes(type) && '🔥'}
           </span>
           {title}
         </PanelTitle>
