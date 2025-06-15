@@ -73,7 +73,7 @@ class RAGChatbot:
         # Initialize LangChain components
         self.embeddings = OpenAIEmbeddings(openai_api_key=openai_key)
         self.llm = ChatOpenAI(
-            model_name="gpt-3.5-turbo",  # Use a less expensive model by default
+            model_name="gpt-4.1",  # Use a less expensive model by default
             temperature=0.3,
             openai_api_key=openai_key
         )

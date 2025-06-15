@@ -217,7 +217,7 @@ JSON only:"""
         if self.groq_client:
             try:
                 response = self.groq_client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
+                    model="meta-llama/llama-4-maverick-17b-128e-instruct",
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=500,
                     temperature=0.1
@@ -233,7 +233,7 @@ JSON only:"""
         if self.openai_client:
             try:
                 response = self.openai_client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model="gpt-4.1",
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=500,
                     temperature=0.1
