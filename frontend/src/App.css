@@ -6,18 +6,11 @@
 }
 
 body {
+    /* Global body styles are primarily handled by GlobalStyle in App.js */
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
-    color: #ffffff;
-    height: 100vh;
-    overflow: hidden;
 }
 
-#root {
-    height: 100vh;
-    width: 100vw;
-    overflow: hidden;
-}
+/* Global #root styles are primarily handled by GlobalStyle in App.js */
 
 .container {
     max-width: 1400px;
@@ -171,65 +164,15 @@ body {
     background: linear-gradient(135d deg, #4ecdc4, #44a08d);
 }
 
-/* Layout Grid Fixes */
-.app-grid {
-    display: grid;
-    grid-template-areas:
-        "left-panel main-graph right-panel"
-        "chatbot chatbot chatbot";
-    grid-template-columns: 300px 1fr 300px;
-    grid-template-rows: 1fr 280px;
-    gap: 16px;
-    padding: 16px;
-    height: 100vh;
-    overflow: hidden;
-}
-
-.main-graph-area {
-    grid-area: main-graph;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 16px;
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    overflow: hidden;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-}
-
-.chatbot-area {
-    grid-area: chatbot;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 16px;
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    overflow: hidden;
-    height: 280px;
-    position: relative;
-    display: flex;
-    flex-direction: column;
-}
-
-.side-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    height: 100%;
-    overflow-y: auto;
-}
-
-.side-panel.left {
-    grid-area: left-panel;
-}
-
-.side-panel.right {
-    grid-area: right-panel;
-}
+/* Layout Grid, Main Graph Area, Chatbot Area, and Side Panel styles are handled by styled-components in App.js */
+/* Removing .app-grid, .main-graph-area, .chatbot-area, .side-panel rules from here to avoid conflicts */
 
 /* Responsive Design */
 @media (max-width: 1200px) {
-    .app-grid {
+    /* AppContainer styled-component in App.js handles responsive grid changes. */
+    /* The body and #root overflow for smaller screens will be handled by GlobalStyle defaults. */
+    /*
+    body {
         grid-template-areas:
             "main-graph"
             "left-panel"
@@ -239,21 +182,7 @@ body {
         grid-template-rows: 1fr auto auto 300px;
         overflow-y: auto;
     }
-
-    body {
-        overflow: auto;
-    }
-
-    #root {
-        overflow: auto;
-        min-height: 100vh;
-        height: auto;
-    }
-
-    .side-panel {
-        max-height: none;
-        overflow-y: visible;
-    }
+    */
 }
 
 @media (max-width: 768px) {

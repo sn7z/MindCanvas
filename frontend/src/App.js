@@ -69,17 +69,20 @@ const GlobalStyle = createGlobalStyle`
   }
   
   html, body {
+    height: 100%; /* Ensure html and body can take full height */
     font-family: ${props => props.theme.fonts.primary};
     background: ${props => props.theme.colors.bg};
     color: ${props => props.theme.colors.text};
-    height: 100%;
-    overflow: hidden;
+    /* Removed overflow: hidden; to allow scrolling */
+    overflow-x: hidden; /* Prevent horizontal scroll on body */
   }
   
   #root {
-    height: 100vh;
+    min-height: 100vh; /* Ensure root takes at least full viewport height */
     width: 100vw;
-    overflow: hidden;
+    /* Removed overflow: hidden; */
+    display: flex; /* Allows AppContainer to grow and fill height */
+    flex-direction: column;
   }
 
   ::-webkit-scrollbar {
@@ -107,6 +110,7 @@ const AppContainer = styled.div`
   grid-template-rows: 1fr 300px;
   gap: ${props => props.theme.spacing.md};
   padding: ${props => props.theme.spacing.md};
+  flex-grow: 1; /* Allows AppContainer to fill #root if #root is flex */
   
   @media (max-width: 1400px) {
     grid-template-columns: 300px 1fr 300px;
@@ -158,7 +162,8 @@ const MainGraphArea = styled(motion.div)`
   border-radius: ${props => props.theme.borderRadius.lg};
   backdrop-filter: blur(20px);
   border: 1px solid ${props => props.theme.colors.border};
-  overflow: hidden;
+  /* Changed overflow: hidden to auto to allow internal scrolling if graph is too large, or for zoom */
+  overflow: auto; 
   box-shadow: ${props => props.theme.shadows.lg};
   position: relative;
   display: flex;

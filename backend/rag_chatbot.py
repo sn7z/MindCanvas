@@ -117,6 +117,7 @@ The context includes content the user has previously browsed, with summaries and
 
     async def process_chat_request(self, request: ChatRequest) -> ChatResponse:
         """Main chat processing pipeline with LangChain"""
+        query_preview = request.message[:80] + "..." if len(request.message) > 80 else request.message
         start_time = datetime.now()
         
         try:
@@ -151,12 +152,13 @@ The context includes content the user has previously browsed, with summaries and
             sources = []
             
             if request.use_rag:
-                # Use direct DB search since vector store isn't working
+                logger.info(f"RAG: RAG is enabled for query: \"{query_preview}\"")
                 docs = await self._retrieve_relevant_context(
                     request.message, 
                     request.max_context_items,
                     request.similarity_threshold
                 )
+                logger.info(f"RAG: Retrieved {len(docs)} context items for query: \"{query_preview}\"")
                 
                 if docs:
                     # Convert to KnowledgeContext format for consistency
@@ -164,6 +166,8 @@ The context includes content the user has previously browsed, with summaries and
                     
                     # Format sources for the response
                     sources = [self._format_source(item) for item in context_items]
+            else:
+                logger.info(f"RAG: RAG is disabled for query: \"{query_preview}\"")
             
             # Step 2: Generate response
             response_text, tokens_used, confidence = await self._generate_response(
@@ -190,24 +194,27 @@ The context includes content the user has previously browsed, with summaries and
 
     async def _retrieve_relevant_context(self, query: str, max_items: int, threshold: float) -> List[KnowledgeContext]:
         """Retrieve relevant content using vector similarity - directly from DB"""
+        query_preview = query[:80] + "..." if len(query) > 80 else query
+        logger.info(f"RAG: Retrieving context for query: \"{query_preview}\"")
         try:
-            # Generate query embedding using our database helper
-            query_embedding = await self.db.generate_embedding(query, use_openai=True)
-            
-            # Use direct DB search from our helper
+            # Query embedding generation is handled within db.semantic_search
             results = await self.db.semantic_search(query, max_items, threshold)
             
             if not results:
-                logger.info(f"No relevant context found for query: {query}")
+                logger.info(f"RAG: No relevant results from semantic_search for query: \"{query_preview}\"")
                 return []
+            
+            logger.info(f"RAG: semantic_search returned {len(results)} candidate items for \"{query_preview}\". Fetching full content...")
             
             # Convert to KnowledgeContext objects
             context_items = []
             for result in results:
                 # Get full content for the item
-                content_response = self.db.client.table('processed_content').select(
-                    'content'
-                ).eq('id', result['id']).execute()
+                content_response = await asyncio.to_thread(
+                    self.db.client.table('processed_content').select(
+                        'content'
+                    ).eq('id', result['id']).execute
+                )
                 
                 content = ""
                 if content_response.data and len(content_response.data) > 0:
@@ -225,7 +232,7 @@ The context includes content the user has previously browsed, with summaries and
                 )
                 context_items.append(context_item)
             
-            logger.info(f"Retrieved {len(context_items)} relevant context items")
+            logger.info(f"RAG: Successfully prepared {len(context_items)} KnowledgeContext items for \"{query_preview}\".")
             return context_items
             
         except Exception as e:
@@ -235,12 +242,15 @@ The context includes content the user has previously browsed, with summaries and
     async def _generate_response(self, query: str, context_items: List[KnowledgeContext], 
                                memory: ConversationBufferMemory) -> tuple[str, int, float]:
         """Generate response using LangChain with RAG context"""
+        query_preview = query[:80] + "..." if len(query) > 80 else query
+        logger.info(f"RAG Generate: Generating response for query: \"{query_preview}\" with {len(context_items)} context items.")
         
         if not context_items:
+            logger.info(f"RAG Generate: No context items provided for query: \"{query_preview}\". Using non-RAG path.")
             # No context available, use simple chat completion
             messages = [
                 SystemMessage(content=self.system_prompt),
-                HumanMessage(content=f"Question: {query}\n\nNote: I don't have specific content in my knowledge base related to this question.")
+                HumanMessage(content=f"Question: {query}\n\nNote: I will answer based on my general knowledge as no specific context from your knowledge base was found for this query.")
             ]
             
             try:
@@ -258,6 +268,11 @@ The context includes content the user has previously browsed, with summaries and
         try:
             # Create context string
             context_str = self._build_context_string(context_items)
+            
+            if not context_str and context_items: # Should not happen if context_items is not empty
+                 logger.warning(f"RAG Generate: Context items were present ({len(context_items)}), but _build_context_string returned empty for query: \"{query_preview}\". This is unexpected.")
+            elif context_str:
+                 logger.info(f"RAG Generate: Built context string for query \"{query_preview}\". Preview: {context_str[:300]}...") # Log more of the context
             
             # Build message history
             chat_history = memory.chat_memory.messages
@@ -361,9 +376,11 @@ Is there a specific aspect of this topic you'd like me to help you explore?"""
         """Generate suggested questions based on knowledge base content"""
         try:
             # Get recent and high-quality content
-            response = self.client.table('processed_content').select(
-                'title, summary, content_type, key_topics'
-            ).gte('quality_score', 7).order('quality_score', desc=True).limit(20).execute()
+            response = await asyncio.to_thread(
+                self.client.table('processed_content').select(
+                    'title, summary, content_type, key_topics'
+                ).gte('quality_score', 7).order('quality_score', desc=True).limit(20).execute
+            )
             
             if not response.data:
                 return [

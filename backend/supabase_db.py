@@ -44,18 +44,19 @@ class SimpleVectorDB:
         self.openai_embedder = OpenAIEmbeddings(openai_api_key=openai_api_key) if openai_api_key else None
         logger.info("✅ Connected to Supabase")
         
-        # Ensure the necessary Supabase functions exist
-        self._ensure_match_function()
+        # The _ensure_match_function will be called from async init_db
     
-    def _ensure_match_function(self):
+    async def _ensure_match_function(self):
         """Ensure the vector similarity search function exists in Supabase"""
         try:
             # Check if function exists by trying a dummy query
             try:
-                self.client.rpc(
-                    'match_processed_content', 
-                    {'query_embedding': [0.0] * 1536, 'match_count': 1}
-                ).execute()
+                await asyncio.to_thread(
+                    self.client.rpc(
+                        'match_processed_content', 
+                        {'query_embedding': [0.0] * 1536, 'match_count': 1}
+                    ).execute
+                )
                 logger.info("✅ Vector search function exists")
             except Exception as e:
                 logger.warning(f"Vector search function may be missing: {e}")
@@ -120,45 +121,58 @@ class SimpleVectorDB:
 
     async def generate_embedding(self, text: str, use_openai: bool = True) -> List[float]:
         """Generate vector embedding for text"""
+        # Assuming DB is configured for 1536 dimensions (OpenAI's text-embedding-ada-002)
+        target_dimension = 1536 
+        text_preview = text[:80] + "..." if len(text) > 80 else text
+
         try:
-            # Prefer OpenAI embeddings for better performance
             if use_openai and self.openai_embedder:
+                logger.info(f"Attempting OpenAI embedding (dim {target_dimension}) for: \"{text_preview}\"")
                 try:
-                    # Run in thread to not block asyncio
                     embedding = await asyncio.to_thread(
                         self.openai_embedder.embed_query, text
                     )
+                    if len(embedding) != target_dimension:
+                        logger.error(f"OpenAI embedding dimension mismatch! Expected {target_dimension}, got {len(embedding)} for \"{text_preview}\". Returning zero vector.")
+                        return [0.0] * target_dimension
+                    logger.info(f"OpenAI embedding successful for \"{text_preview}\", dimension: {len(embedding)}")
                     return embedding
                 except Exception as e:
-                    logger.warning(f"OpenAI embedding failed, falling back to sentence-transformers: {e}")
-            
-            # Fallback to sentence-transformers
-            embedding = await asyncio.to_thread(
-                self.st_embedder.encode, text
-            )
-            return embedding.tolist()
+                    logger.warning(f"OpenAI embedding failed for \"{text_preview}\": {e}. OpenAI API key might be missing or invalid.")
+                    logger.info(f"Cannot fall back to SentenceTransformer for \"{text_preview}\" due to dimension mismatch (384 vs {target_dimension}). Returning zero vector.")
+                    return [0.0] * target_dimension
+            else:
+                # This path is taken if use_openai is False OR self.openai_embedder is None (e.g. no API key)
+                # If the database strictly requires 1536-dim, using ST (384-dim) here is problematic.
+                logger.warning(
+                    f"OpenAI embedding not attempted or not available for \"{text_preview}\". "
+                    f"Current DB schema expects {target_dimension}-dim. "
+                    f"Using SentenceTransformer (384-dim) will lead to incompatibility."
+                )
+                # Forcing a zero vector of the target dimension if OpenAI isn't used/available,
+                # as ST would produce incompatible dimensions for a 1536-dim DB.
+                logger.error(f"Returning {target_dimension}-dim zero vector for \"{text_preview}\" as incompatible fallback was attempted.")
+                return [0.0] * target_dimension
+                
         except Exception as e:
-            logger.error(f"Embedding failed: {e}")
-            # Return zero vector as fallback
-            return [0.0] * (1536 if use_openai and self.openai_embedder else 384)
+            logger.error(f"Critical embedding generation failure for \"{text_preview}\": {e}")
+            return [0.0] * target_dimension
 
     async def store_content(self, item: ContentItem) -> bool:
         """Store content with vector embedding"""
         try:
-            # Generate embedding if not provided
             if not item.embedding:
-                # Use title + summary for embedding
                 text = f"{item.title} {item.summary}"
-                item.embedding = await self.generate_embedding(text)
+                item.embedding = await self.generate_embedding(text, use_openai=bool(self.openai_embedder))
             
-            # Store in database
             data = asdict(item)
             
-            # Handle datetime serialization
             if isinstance(data['visit_timestamp'], datetime):
                 data['visit_timestamp'] = data['visit_timestamp'].isoformat()
             
-            result = self.client.table('processed_content').upsert(data).execute()
+            result = await asyncio.to_thread(
+                self.client.table('processed_content').upsert(data).execute
+            )
             return bool(result.data)
             
         except Exception as e:
@@ -167,23 +181,31 @@ class SimpleVectorDB:
 
     async def semantic_search(self, query: str, limit: int = 20, threshold: float = 0.3) -> List[Dict]:
         """Search using vector similarity"""
+        query_preview = query[:80] + "..." if len(query) > 80 else query
+        logger.info(f"Semantic search initiated for query: \"{query_preview}\"")
         try:
-            # Generate query embedding
-            query_embedding = await self.generate_embedding(query)
+            query_embedding = await self.generate_embedding(query, use_openai=bool(self.openai_embedder))
             
-            # Try using the match function first (more efficient)
+            if not query_embedding or len(query_embedding) != 1536: # Critical check for OpenAI dimension
+                logger.error(f"Failed to generate a valid 1536-dim query embedding for \"{query_preview}\". Aborting search.")
+                return []
+            logger.info(f"Query embedding generated for \"{query_preview}\", dimension: {len(query_embedding)}")
+
             try:
-                response = self.client.rpc(
-                    'match_processed_content',
-                    {
-                        'query_embedding': query_embedding, 
-                        'match_count': limit, 
-                        'match_threshold': threshold
-                    }
-                ).execute()
+                logger.info(f"Attempting RPC 'match_processed_content' for \"{query_preview}\"")
+                response = await asyncio.to_thread(
+                    self.client.rpc(
+                        'match_processed_content',
+                        {
+                            'query_embedding': query_embedding, 
+                            'match_count': limit, 
+                            'match_threshold': threshold
+                        }
+                    ).execute
+                )
                 
                 if response.data:
-                    # Process results
+                    logger.info(f"RPC search successful for \"{query_preview}\", found {len(response.data)} items.")
                     results = []
                     for item in response.data:
                         results.append({
@@ -197,26 +219,34 @@ class SimpleVectorDB:
                             'similarity': round(item.get('similarity', 0), 3)
                         })
                     return results
+                else:
+                    logger.info(f"RPC search for \"{query_preview}\" returned no data.")
+                    return [] # Explicitly return empty list
             except Exception as e:
-                logger.warning(f"RPC search failed, falling back to manual search: {e}")
+                logger.warning(f"RPC search for \"{query_preview}\" failed: {e}. Falling back to manual search.")
             
-            # Fallback: manual vector search
-            # Get all content with embeddings
-            response = self.client.table('processed_content').select(
-                'id, url, title, summary, content_type, key_topics, quality_score, embedding'
-            ).execute()
+            logger.info(f"Attempting manual vector search for \"{query_preview}\"...")
+            response = await asyncio.to_thread(
+                self.client.table('processed_content').select(
+                    'id, url, title, summary, content_type, key_topics, quality_score, embedding'
+                ).filter(
+                    'embedding', 'isnot', 'null' # Ensure we only fetch rows with embeddings
+                ).execute # Add a limit here if table is very large, e.g., .limit(1000)
+            )
             
             if not response.data:
                 return []
             
             # Calculate similarities
             results = []
+            logger.info(f"Manual search: Fetched {len(response.data)} items with embeddings to compare against \"{query_preview}\".")
             for item in response.data:
-                if not item.get('embedding'):
+                item_embedding = item.get('embedding')
+                if not item_embedding or len(item_embedding) != 1536: # Check dimension
+                    logger.warning(f"Skipping item ID {item.get('id')} due to missing or invalid dimension embedding during manual search.")
                     continue
                 
-                # Calculate cosine similarity
-                similarity = self._cosine_similarity(query_embedding, item['embedding'])
+                similarity = self._cosine_similarity(query_embedding, item_embedding)
                 
                 if similarity >= threshold:
                     results.append({
@@ -232,36 +262,41 @@ class SimpleVectorDB:
             
             # Sort by similarity and return top results
             results.sort(key=lambda x: x['similarity'], reverse=True)
+            logger.info(f"Manual search for \"{query_preview}\" yielded {len(results)} results after filtering and sorting.")
             return results[:limit]
             
         except Exception as e:
-            logger.error(f"Search failed: {e}")
-            return []
+            logger.error(f"Outer semantic_search failed for \"{query_preview}\": {e}", exc_info=True)
+            return [] # Ensure a list is always returned
 
     async def get_related_content(self, content_id: int, limit: int = 10) -> List[Dict]:
         """Find content similar to given content"""
         try:
             # Get source content embedding
-            source = self.client.table('processed_content').select(
-                'embedding, title, summary'
-            ).eq('id', content_id).execute()
+            source_response = await asyncio.to_thread(
+                self.client.table('processed_content').select(
+                    'embedding, title, summary'
+                ).eq('id', content_id).execute
+            )
+            source = source_response.data
             
-            if not source.data or not source.data[0].get('embedding'):
+            if not source or not source[0].get('embedding'):
                 return []
             
-            source_embedding = source.data[0]['embedding']
-            source_text = f"{source.data[0].get('title', '')} {source.data[0].get('summary', '')}"
+            source_embedding = source[0]['embedding']
             
             # Try to use the match function first
             try:
-                response = self.client.rpc(
-                    'match_processed_content',
-                    {
-                        'query_embedding': source_embedding, 
-                        'match_count': limit + 1,
-                        'match_threshold': 0.3
-                    }
-                ).execute()
+                response = await asyncio.to_thread(
+                    self.client.rpc(
+                        'match_processed_content',
+                        {
+                            'query_embedding': source_embedding, 
+                            'match_count': limit + 1, # Fetch one more to exclude self
+                            'match_threshold': 0.3
+                        }
+                    ).execute
+                )
                 
                 if response.data:
                     # Filter out the source item itself
@@ -281,12 +316,14 @@ class SimpleVectorDB:
                 logger.warning(f"RPC related content search failed: {e}")
             
             # Fallback: Find similar content manually
-            all_content = self.client.table('processed_content').select(
-                'id, url, title, summary, content_type, embedding'
-            ).neq('id', content_id).execute()
+            all_content_response = await asyncio.to_thread(
+                self.client.table('processed_content').select(
+                    'id, url, title, summary, content_type, embedding'
+                ).neq('id', content_id).execute
+            )
             
             results = []
-            for item in all_content.data or []:
+            for item in all_content_response.data or []:
                 if not item.get('embedding'):
                     continue
                 
@@ -312,9 +349,11 @@ class SimpleVectorDB:
     async def cluster_content(self) -> List[Dict]:
         """Simple clustering by content type"""
         try:
-            response = self.client.table('processed_content').select(
-                'content_type'
-            ).execute()
+            response = await asyncio.to_thread(
+                self.client.table('processed_content').select(
+                    'content_type'
+                ).execute
+            )
             
             if not response.data:
                 return []
@@ -345,9 +384,11 @@ class SimpleVectorDB:
     async def get_trending_topics(self, limit: int = 10) -> List[Dict]:
         """Get most frequent topics"""
         try:
-            response = self.client.table('processed_content').select(
-                'key_topics, quality_score'
-            ).execute()
+            response = await asyncio.to_thread(
+                self.client.table('processed_content').select(
+                    'key_topics, quality_score'
+                ).execute
+            )
             
             if not response.data:
                 return []
@@ -384,11 +425,13 @@ class SimpleVectorDB:
     async def get_analytics(self) -> Dict:
         """Basic analytics"""
         try:
-            response = self.client.table('processed_content').select(
-                'processing_method, content_type, quality_score, created_at'
-            ).execute()
+            response = await asyncio.to_thread(
+                self.client.table('processed_content').select(
+                    'processing_method, content_type, quality_score, created_at'
+                ).execute
+            )
             
-            data = response.data or []
+            data = response.data if response and response.data else []
             
             # Basic stats
             total = len(data)
@@ -422,9 +465,11 @@ class SimpleVectorDB:
     async def export_data(self) -> Dict:
         """Export all content as knowledge graph"""
         try:
-            response = self.client.table('processed_content').select(
-                'id, title, summary, content_type, key_topics, quality_score, url'
-            ).execute()
+            response = await asyncio.to_thread(
+                self.client.table('processed_content').select(
+                    'id, title, summary, content_type, key_topics, quality_score, url'
+                ).execute
+            )
             
             nodes = response.data or []
             
@@ -459,52 +504,49 @@ class SimpleVectorDB:
 
     async def health_check(self) -> Dict:
         """Check if everything is working"""
+        db_connected_status = False
+        error_message = None
         try:
-            # Test database connection
-            test = self.client.table('processed_content').select('id').limit(1).execute()
-            
-            # Test embedding generation
-            test_embedding = await self.generate_embedding("test")
-            
-            # Count content
-            count_response = self.client.table('processed_content').select('id', count='exact').execute()
-            content_count = count_response.count or 0
-            
-            # Check if any content has embeddings
-            embedding_response = self.client.table('processed_content').select(
-                'id'
-            ).not_('embedding', 'is', 'null').limit(1).execute()
-            has_embeddings = len(embedding_response.data or []) > 0
-            
-            return {
-                'status': 'healthy',
-                'database_connected': True,
-                'embedding_working': len(test_embedding) > 0,
-                'content_count': content_count,
-                'has_embeddings': has_embeddings,
-                'timestamp': datetime.now().isoformat()
-            }
-            
+            # Test database connection with a very simple query
+            await asyncio.to_thread(
+                self.client.table('processed_content').select('id').limit(1).execute
+            )
+            db_connected_status = True
         except Exception as e:
+            logger.error(f"Database health check connection failed: {e}")
+            error_message = str(e)
+            # Fall through to return unhealthy status
+
+        embedding_service_configured = bool(self.openai_embedder) and bool(self.openai_embedder.openai_api_key)
+
+        status = 'healthy' if db_connected_status and embedding_service_configured else 'degraded'
+        if error_message: # If DB connection failed, it's unhealthy
+            status = 'unhealthy'
+
+        return_payload = {
+            'status': status,
+            'database_connected': db_connected_status,
+            'embedding_service_configured': embedding_service_configured,
+            'timestamp': datetime.now().isoformat()
+        }
+        if error_message:
+            return_payload['error'] = error_message
             return {
-                'status': 'unhealthy',
-                'error': str(e),
-                'timestamp': datetime.now().isoformat()
+                'status': 'unhealthy', 'error': str(e), 'timestamp': datetime.now().isoformat()
             }
+        return return_payload
 
     def _cosine_similarity(self, a: List[float], b: List[float]) -> float:
         """Calculate cosine similarity between two vectors"""
         try:
             vec_a = np.array(a)
             vec_b = np.array(b)
-            
-            # Check if vectors have same dimensions
+
             if len(vec_a) != len(vec_b):
-                # Attempt to resize to the smaller dimension
-                min_dim = min(len(vec_a), len(vec_b))
-                vec_a = vec_a[:min_dim]
-                vec_b = vec_b[:min_dim]
-            
+                logger.error(f"Cosine similarity: Vector dimensions mismatch! {len(vec_a)} vs {len(vec_b)}. Returning 0.")
+                return 0.0
+            if len(vec_a) == 0: # Handles empty lists if they somehow get here
+                return 0.0
             dot_product = np.dot(vec_a, vec_b)
             norm_a = np.linalg.norm(vec_a)
             norm_b = np.linalg.norm(vec_b)
@@ -522,6 +564,7 @@ class SimpleVectorDB:
 async def init_db(openai_api_key=None):
     """Initialize the database"""
     db = SimpleVectorDB(openai_api_key)
+    await db._ensure_match_function() # Call the async version here
     health = await db.health_check()
     logger.info(f"Database status: {health['status']}")
     

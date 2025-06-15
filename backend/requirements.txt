@@ -10,7 +10,7 @@ supabase
 uvicorn
 fastapi
 pip install langchain
-pip install langchain-openai
+pip install langchain-community
 pip install tiktoken
 pip install openai
 pip install fastapi uvicorn supabase sentence-transformers

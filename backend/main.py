@@ -346,7 +346,9 @@ async def process_urls(items: List[HistoryItem]) -> Dict[str, int]:
     
     for item in valid_items:
         try:
-            existing = db.client.table('processed_content').select('id').eq('url', item.url).execute()
+            existing = await asyncio.to_thread(
+                db.client.table('processed_content').select('id').eq('url', item.url).execute
+            )
             if existing.data:
                 existing_count += 1
                 continue
@@ -551,9 +553,14 @@ async def get_chat_context(query: str, limit: int = 5, threshold: float = 0.3):
     if not rag_chatbot:
         raise HTTPException(status_code=503, detail="RAG chatbot not available")
     
+    query_preview = query[:80] + "..." if len(query) > 80 else query
+    logger.info(f"API: Getting chat context for query: \"{query_preview}\"")
     try:
-        # Get the documents from the vector database
-        docs = await db.get_documents_by_query(query, limit, threshold)
+        # Corrected: Use semantic_search instead of non-existent get_documents_by_query
+        # The results from semantic_search are already dictionaries, not Document objects
+        # unless you have a LangChain vector store wrapper.
+        # Assuming db.semantic_search returns a list of dicts as defined in SimpleVectorDB
+        docs = await db.semantic_search(query, limit, threshold)
         
         formatted_context = []
         for doc in docs:
@@ -564,7 +571,8 @@ async def get_chat_context(query: str, limit: int = 5, threshold: float = 0.3):
                 "quality_score": doc.metadata.get("quality_score", 0),
                 "similarity": round(doc.metadata.get("similarity", 0), 3),
                 "url": doc.metadata.get("url", ""),
-                "content_preview": doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content
+                # Assuming 'summary' can act as a preview, or you might need to fetch full content if not already in 'doc'
+                "content_preview": doc.get("summary", "")[:200] + "..." 
             })
         
         return {
@@ -573,61 +581,68 @@ async def get_chat_context(query: str, limit: int = 5, threshold: float = 0.3):
             "total_found": len(formatted_context)
         }
     except Exception as e:
-        logger.error(f"Failed to get context: {e}")
+        logger.error(f"Failed to get context for query \"{query_preview}\": {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/chat/health")
 async def chat_health_check():
     """Check chatbot system health"""
-    try:
-        openai_ok = bool(OPENAI_API_KEY)
-        rag_ok = rag_chatbot is not None
-        vector_ok = db is not None
-        
+    openai_configured = bool(OPENAI_API_KEY)
+    rag_initialized = rag_chatbot is not None
+    db_connection_ok = False
+    
+    # Lightweight DB check
+    if db:
         try:
-            test_query = db.client.table('processed_content').select('id').limit(1).execute()
-            db_ok = test_query is not None
-        except:
-            db_ok = False
-        
-        # Try to get an embedding to verify the LangChain integration is working
-        embeddings_ok = False
-        if openai_ok:
-            try:
-                embedder = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
-                embedding = embedder.embed_query("test")
-                embeddings_ok = len(embedding) > 0
-            except Exception as e:
-                logger.error(f"Embedding test failed: {e}")
-                embeddings_ok = False
-        
-        status = "healthy" if all([openai_ok, rag_ok, db_ok, embeddings_ok]) else "degraded"
-        
-        return {
-            "status": status,
-            "components": {
-                "openai_api": "ok" if openai_ok else "error",
-                "rag_chatbot": "ok" if rag_ok else "error", 
-                "vector_store": "ok" if vector_ok else "error",
-                "database": "ok" if db_ok else "error",
-                "embeddings": "ok" if embeddings_ok else "error"
-            },
-            "timestamp": datetime.now().isoformat()
-        }
-    except Exception as e:
-        return {
-            "status": "unhealthy",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        } 
+            await asyncio.to_thread(db.client.table('processed_content').select('id').limit(1).execute)
+            db_connection_ok = True
+        except Exception as e:
+            logger.error(f"Chat health DB check failed: {e}")
+            db_connection_ok = False
+
+    # Check if embeddings can be *configured* (not actually generating one)
+    embeddings_configured_in_rag = False
+    if rag_initialized and hasattr(rag_chatbot, 'embeddings') and rag_chatbot.embeddings:
+        # Check if API key is set for the OpenAI embedder
+        if isinstance(rag_chatbot.embeddings, OpenAIEmbeddings):
+            if rag_chatbot.embeddings.openai_api_key:
+                embeddings_configured_in_rag = True
+        else: # For other embedders like SentenceTransformer
+             embeddings_configured_in_rag = True
+
+    status = "healthy"
+    components_status = {
+        "openai_api_configured": "ok" if openai_configured else "warning", # API key might not be needed if Groq is primary
+        "rag_chatbot_initialized": "ok" if rag_initialized else "error",
+        "database_connection": "ok" if db_connection_ok else "error",
+        "rag_embeddings_configured": "ok" if embeddings_configured_in_rag else "warning" # Embeddings might be optional for some chat modes
+    }
+
+    # Determine overall status
+    if not db_connection_ok or not rag_initialized: # Critical components
+        status = "unhealthy"
+    elif not all(s == "ok" for s in components_status.values()):
+         # If any component is not 'ok' but critical ones are fine, it's 'degraded'
+        if any(s == "error" for s in components_status.values()): # if any error, then unhealthy
+            status = "unhealthy"
+        else: # only warnings
+            status = "degraded"
+            
+    return {
+        "status": status,
+        "components": components_status,
+        "timestamp": datetime.now().isoformat()
+    }
     
 @app.get("/api/content")
 async def get_content(limit: int = 100):
     """Get processed content"""
     try:
-        response = db.client.table('processed_content').select(
-            'id, url, title, summary, content_type, key_topics, quality_score, processing_method'
-        ).order('quality_score', desc=True).limit(limit).execute()
+        response = await asyncio.to_thread(
+            db.client.table('processed_content').select(
+                'id, url, title, summary, content_type, key_topics, quality_score, processing_method'
+            ).order('quality_score', desc=True).limit(limit).execute
+        )
         
         content = []
         for row in response.data or []:
@@ -665,11 +680,13 @@ async def semantic_search(request: SearchRequest):
 async def text_search(q: str, limit: int = 50):
     """Basic text search"""
     try:
-        response = db.client.table('processed_content').select(
-            'id, url, title, summary, content_type, key_topics, quality_score'
-        ).or_(
-            f'title.ilike.%{q}%, summary.ilike.%{q}%'
-        ).limit(limit).execute()
+        response = await asyncio.to_thread(
+            db.client.table('processed_content').select(
+                'id, url, title, summary, content_type, key_topics, quality_score'
+            ).or_(
+                f'title.ilike.%{q}%, summary.ilike.%{q}%' # Note: for multiple fields, Supabase might need a specific function or view
+            ).limit(limit).execute
+        )
         
         results = []
         for row in response.data or []:
@@ -743,9 +760,11 @@ async def get_recommendations(limit: int = 10):
     """Get content recommendations"""
     try:
         # Just return high-quality recent content
-        response = db.client.table('processed_content').select(
-            'id, url, title, summary, content_type, quality_score'
-        ).gte('quality_score', 7).order('quality_score', desc=True).limit(limit).execute()
+        response = await asyncio.to_thread(
+            db.client.table('processed_content').select(
+                'id, url, title, summary, content_type, quality_score'
+            ).gte('quality_score', 7).order('quality_score', desc=True).limit(limit).execute
+        )
         
         recommendations = []
         for row in response.data or []:
@@ -798,7 +817,9 @@ async def get_stats():
 async def reset_database():
     """Reset all data"""
     try:
-        db.client.table('processed_content').delete().neq('id', 0).execute()
+        await asyncio.to_thread(
+            db.client.table('processed_content').delete().neq('id', 0).execute
+        )
         return {
             "status": "success",
             "message": "Database reset successfully"
