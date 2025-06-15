@@ -347,38 +347,75 @@ class SimpleVectorDB:
             return []
 
     async def cluster_content(self) -> List[Dict]:
-        """Simple clustering by content type"""
+        """Simple and clean clustering by content type with quality weighting"""
         try:
             response = await asyncio.to_thread(
                 self.client.table('processed_content').select(
-                    'content_type'
+                    'id, title, content_type, quality_score, key_topics'
                 ).execute
             )
             
             if not response.data:
                 return []
             
-            # Count by content type
-            clusters = {}
+            # Group by content type (primary clustering)
+            type_clusters = {}
             for item in response.data:
                 content_type = item.get('content_type', 'Unknown')
-                clusters[content_type] = clusters.get(content_type, 0) + 1
+                if content_type not in type_clusters:
+                    type_clusters[content_type] = {
+                        'items': [],
+                        'total_quality': 0,
+                        'topic_frequency': {}
+                    }
+                
+                type_clusters[content_type]['items'].append(item)
+                type_clusters[content_type]['total_quality'] += item.get('quality_score', 5)
+                
+                # Count topic frequencies within each type
+                topics = item.get('key_topics', [])
+                if topics:
+                    for topic in topics:
+                        if topic not in type_clusters[content_type]['topic_frequency']:
+                            type_clusters[content_type]['topic_frequency'][topic] = 0
+                        type_clusters[content_type]['topic_frequency'][topic] += 1
             
-            # Create cluster objects
-            result = []
-            for i, (name, count) in enumerate(clusters.items(), 1):
-                if count >= 2:  # Only clusters with 2+ items
-                    result.append({
-                        'id': i,
-                        'name': f"{name} Cluster",
-                        'description': f"{count} items of type {name}",
-                        'content_count': count
+            # Create clean cluster objects
+            clusters = []
+            for cluster_id, (content_type, cluster_data) in enumerate(type_clusters.items(), 1):
+                item_count = len(cluster_data['items'])
+                if item_count >= 1:  # Include all clusters, even single items
+                    avg_quality = cluster_data['total_quality'] / item_count
+                    
+                    # Get top 3 topics for this cluster
+                    top_topics = sorted(
+                        cluster_data['topic_frequency'].items(),
+                        key=lambda x: x[1],
+                        reverse=True
+                    )[:3]
+                    
+                    clusters.append({
+                        'id': cluster_id,
+                        'name': f"{content_type} Collection",
+                        'description': f"{item_count} {content_type.lower()} items with avg quality {avg_quality:.1f}",
+                        'content_count': item_count,
+                        'content_type': content_type,
+                        'average_quality': round(avg_quality, 1),
+                        'top_topics': [topic for topic, count in top_topics],
+                        'quality_range': {
+                            'min': min(item.get('quality_score', 5) for item in cluster_data['items']),
+                            'max': max(item.get('quality_score', 5) for item in cluster_data['items'])
+                        }
                     })
             
-            return result
+            # Sort clusters by quality and size
+            clusters.sort(key=lambda x: (x['average_quality'], x['content_count']), reverse=True)
+            
+            logger.info(f"Created {len(clusters)} clean content clusters")
+            return clusters
             
         except Exception as e:
-            logger.error(f"Clustering failed: {e}")
+            logger.error(f"Clean clustering failed: {e}")
             return []
 
     async def get_trending_topics(self, limit: int = 10) -> List[Dict]:
@@ -422,6 +459,60 @@ class SimpleVectorDB:
             logger.error(f"Trending topics failed: {e}")
             return []
 
+    # Also add this method for topic-based sub-clustering if needed
+    async def get_topic_clusters(self, content_type: str = None) -> List[Dict]:
+        """Get clusters based on topics within a content type"""
+        try:
+            query = self.client.table('processed_content').select(
+                'id, title, content_type, quality_score, key_topics'
+            )
+            
+            if content_type:
+                query = query.eq('content_type', content_type)
+            
+            response = await asyncio.to_thread(query.execute)
+            
+            if not response.data:
+                return []
+            
+            # Group by most frequent topic
+            topic_clusters = {}
+            for item in response.data:
+                topics = item.get('key_topics', [])
+                if not topics:
+                    continue
+                
+                # Use the first topic as primary cluster
+                primary_topic = topics[0]
+                
+                if primary_topic not in topic_clusters:
+                    topic_clusters[primary_topic] = []
+                
+                topic_clusters[primary_topic].append(item)
+            
+            # Create topic cluster objects
+            clusters = []
+            for cluster_id, (topic, items) in enumerate(topic_clusters.items(), 1):
+                if len(items) >= 2:  # Only clusters with 2+ items
+                    avg_quality = sum(item.get('quality_score', 5) for item in items) / len(items)
+                    
+                    clusters.append({
+                        'id': f"topic_{cluster_id}",
+                        'name': f"{topic} Topics",
+                        'description': f"{len(items)} items related to {topic}",
+                        'content_count': len(items),
+                        'topic': topic,
+                        'average_quality': round(avg_quality, 1),
+                        'content_types': list(set(item.get('content_type', 'Unknown') for item in items))
+                    })
+            
+            clusters.sort(key=lambda x: x['content_count'], reverse=True)
+            return clusters
+            
+        except Exception as e:
+            logger.error(f"Topic clustering failed: {e}")
+            return []
+    
     async def get_analytics(self) -> Dict:
         """Basic analytics"""
         try:
