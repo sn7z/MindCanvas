@@ -722,16 +722,18 @@ async def get_related(content_id: int, limit: int = 10):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/cluster")
+@app.get("/api/cluster")
 async def cluster_content():
-    """Cluster content"""
+    """Get content clusters - Fixed to use GET method"""
     try:
         clusters = await db.cluster_content()
         return {
             "clusters": clusters,
-            "total": len(clusters)
+            "total": len(clusters),
+            "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
+        logger.error(f"Clustering failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/trending")
@@ -786,12 +788,120 @@ async def get_recommendations(limit: int = 10):
 
 @app.get("/api/knowledge-graph/export")
 async def export_knowledge_graph():
-    """Export knowledge graph"""
+    """Export knowledge graph with proper nodes and links format"""
     try:
-        data = await db.export_data()
-        return data
+        # Get all content from database
+        response = await asyncio.to_thread(
+            db.client.table('processed_content').select(
+                'id, url, title, summary, content_type, key_topics, quality_score, processing_method, visit_timestamp'
+            ).execute
+        )
+        
+        if not response.data or len(response.data) == 0:
+            return {
+                "nodes": [],
+                "links": [],
+                "metadata": {
+                    "total_nodes": 0,
+                    "total_links": 0,
+                    "exported_at": datetime.now().isoformat()
+                }
+            }
+        
+        # Process nodes
+        nodes = []
+        for item in response.data:
+            node = {
+                "id": str(item['id']),
+                "name": item.get('title', f"Content {item['id']}"),
+                "title": item.get('title', f"Content {item['id']}"),
+                "type": item.get('content_type', 'Unknown'),
+                "content_type": item.get('content_type', 'Unknown'),
+                "quality": item.get('quality_score', 5),
+                "quality_score": item.get('quality_score', 5),
+                "summary": item.get('summary', ''),
+                "description": item.get('summary', ''),
+                "topics": item.get('key_topics', []),
+                "key_topics": item.get('key_topics', []),
+                "url": item.get('url', ''),
+                "processing_method": item.get('processing_method', 'unknown'),
+                "visit_timestamp": item.get('visit_timestamp')
+            }
+            nodes.append(node)
+        
+        # Create links based on shared topics
+        links = []
+        link_id = 0
+        
+        for i, node1 in enumerate(nodes):
+            topics1 = set(node1.get('topics', []))
+            
+            for j, node2 in enumerate(nodes[i+1:], i+1):
+                topics2 = set(node2.get('topics', []))
+                shared_topics = topics1.intersection(topics2)
+                
+                # Create link if nodes share at least 1 topic
+                if len(shared_topics) >= 1:
+                    similarity = len(shared_topics) / max(len(topics1), len(topics2), 1)
+                    
+                    link = {
+                        "id": f"link_{link_id}",
+                        "source": node1["id"],
+                        "target": node2["id"],
+                        "shared_topics": list(shared_topics),
+                        "weight": len(shared_topics),
+                        "similarity": similarity
+                    }
+                    links.append(link)
+                    link_id += 1
+        
+        # Also create links based on same content type (weaker connections)
+        for i, node1 in enumerate(nodes):
+            for j, node2 in enumerate(nodes[i+1:], i+1):
+                # Skip if already connected by topics
+                if any(link['source'] == node1['id'] and link['target'] == node2['id'] for link in links):
+                    continue
+                
+                # Connect nodes of same content type with low similarity
+                if node1.get('content_type') == node2.get('content_type') and node1.get('content_type') != 'Unknown':
+                    link = {
+                        "id": f"link_{link_id}",
+                        "source": node1["id"],
+                        "target": node2["id"],
+                        "shared_topics": [],
+                        "weight": 1,
+                        "similarity": 0.2  # Low similarity for same-type connections
+                    }
+                    links.append(link)
+                    link_id += 1
+        
+        # Limit links to prevent overcrowding (max 3 per node on average)
+        max_links = min(len(links), len(nodes) * 3)
+        if len(links) > max_links:
+            # Sort by similarity and keep the strongest connections
+            links.sort(key=lambda x: x['similarity'], reverse=True)
+            links = links[:max_links]
+        
+        graph_data = {
+            "nodes": nodes,
+            "links": links,
+            "edges": links,  # Also provide as 'edges' for compatibility
+            "metadata": {
+                "total_nodes": len(nodes),
+                "total_links": len(links),
+                "exported_at": datetime.now().isoformat(),
+                "connection_types": ["topic_similarity", "content_type"],
+                "min_similarity": min([link['similarity'] for link in links]) if links else 0,
+                "max_similarity": max([link['similarity'] for link in links]) if links else 0
+            }
+        }
+        
+        logger.info(f"Exported knowledge graph: {len(nodes)} nodes, {len(links)} links")
+        return graph_data
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Knowledge graph export failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
 
 @app.get("/api/stats")
 async def get_stats():

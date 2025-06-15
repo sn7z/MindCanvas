@@ -346,6 +346,7 @@ class SimpleVectorDB:
             logger.error(f"Related content failed: {e}")
             return []
 
+    # Also add this improved cluster_content method to your supabase_db.py
     async def cluster_content(self) -> List[Dict]:
         """Simple and clean clustering by content type with quality weighting"""
         try:
@@ -554,36 +555,59 @@ class SimpleVectorDB:
             return {}
 
     async def export_data(self) -> Dict:
-        """Export all content as knowledge graph"""
+        """Export all content as knowledge graph - Updated for better compatibility"""
         try:
             response = await asyncio.to_thread(
                 self.client.table('processed_content').select(
-                    'id, title, summary, content_type, key_topics, quality_score, url'
+                    'id, title, summary, content_type, key_topics, quality_score, url, visit_timestamp, processing_method'
                 ).execute
             )
             
             nodes = response.data or []
             
+            # Process nodes for better compatibility
+            processed_nodes = []
+            for node in nodes:
+                processed_node = {
+                    "id": str(node['id']),
+                    "name": node.get('title', f"Content {node['id']}"),
+                    "title": node.get('title', f"Content {node['id']}"),
+                    "type": node.get('content_type', 'Unknown'),
+                    "content_type": node.get('content_type', 'Unknown'),
+                    "quality": node.get('quality_score', 5),
+                    "quality_score": node.get('quality_score', 5),
+                    "summary": node.get('summary', ''),
+                    "topics": node.get('key_topics', []),
+                    "key_topics": node.get('key_topics', []),
+                    "url": node.get('url', ''),
+                    "visit_timestamp": node.get('visit_timestamp'),
+                    "processing_method": node.get('processing_method', 'unknown')
+                }
+                processed_nodes.append(processed_node)
+            
             # Create simple edges based on shared topics
             edges = []
-            for i, node1 in enumerate(nodes):
-                topics1 = set(node1.get('key_topics', []))
-                for j, node2 in enumerate(nodes[i+1:], i+1):
-                    topics2 = set(node2.get('key_topics', []))
+            for i, node1 in enumerate(processed_nodes):
+                topics1 = set(node1.get('topics', []))
+                for j, node2 in enumerate(processed_nodes[i+1:], i+1):
+                    topics2 = set(node2.get('topics', []))
                     shared = topics1.intersection(topics2)
                     
                     if len(shared) >= 1:
                         edges.append({
                             'source': node1['id'],
                             'target': node2['id'],
-                            'shared_topics': list(shared)
+                            'shared_topics': list(shared),
+                            'weight': len(shared),
+                            'similarity': len(shared) / max(len(topics1), len(topics2), 1)
                         })
             
             return {
-                'nodes': nodes,
+                'nodes': processed_nodes,
                 'edges': edges,
+                'links': edges,  # Provide both for compatibility
                 'metadata': {
-                    'total_nodes': len(nodes),
+                    'total_nodes': len(processed_nodes),
                     'total_edges': len(edges),
                     'exported_at': datetime.now().isoformat()
                 }
@@ -591,7 +615,17 @@ class SimpleVectorDB:
             
         except Exception as e:
             logger.error(f"Export failed: {e}")
-            return {}
+            return {
+                'nodes': [],
+                'edges': [],
+                'links': [],
+                'metadata': {
+                    'total_nodes': 0,
+                    'total_edges': 0,
+                    'exported_at': datetime.now().isoformat(),
+                    'error': str(e)
+                }
+            }
 
     async def health_check(self) -> Dict:
         """Check if everything is working"""
