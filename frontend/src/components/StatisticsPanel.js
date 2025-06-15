@@ -414,20 +414,7 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
               <div className="stat-change positive">↗ AI Ready</div>
             </StatCard>
   
-            <StatCard
-              color="#ff6b6b"
-              colorSecondary="#ee5a52"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <div className="stat-header">
-                <span className="icon">⭐</span>
-              </div>
-              <div className="stat-value">{processedData?.avgQuality?.toFixed(1) || '0.0'}</div>
-              <div className="stat-label">Average Quality</div>
-              <div className="stat-change positive">↗ High Quality</div>
-            </StatCard>
+            
           </>
         );
   
