@@ -1,4 +1,4 @@
-// src/components/StatisticsPanel.js
+// src/components/StatisticsPanel.js - Fixed chart rendering and layout
 import React, { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,6 +8,7 @@ import {
   ResponsiveContainer, Area, AreaChart
 } from 'recharts';
 
+// Fixed styling for proper container width and overflow handling
 const PanelContainer = styled(motion.div)`
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(20px);
@@ -17,6 +18,8 @@ const PanelContainer = styled(motion.div)`
   box-shadow: ${props => props.theme.shadows.md};
   height: fit-content;
   min-height: 300px;
+  width: 100%; /* Ensure full width */
+  max-width: 100%; /* Prevent overflow */
 `;
 
 const PanelHeader = styled.div`
@@ -26,6 +29,7 @@ const PanelHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%; /* Ensure full width */
 `;
 
 const PanelTitle = styled.h3`
@@ -66,6 +70,7 @@ const PanelContent = styled.div`
   padding: ${props => props.theme.spacing.lg};
   height: 100%;
   min-height: 200px;
+  width: 100%; /* Ensure full width */
 `;
 
 const StatCard = styled(motion.div)`
@@ -77,6 +82,7 @@ const StatCard = styled(motion.div)`
   box-shadow: ${props => props.theme.shadows.sm};
   position: relative;
   overflow: hidden;
+  width: 100%; /* Ensure full width */
   
   &::before {
     content: '';
@@ -132,9 +138,12 @@ const StatCard = styled(motion.div)`
   }
 `;
 
+// Fixed chart container with proper dimensions
 const ChartContainer = styled.div`
   height: 250px;
   margin: ${props => props.theme.spacing.md} 0;
+  width: 100%; /* Ensure full width */
+  position: relative; /* For positioning */
   
   .recharts-text {
     fill: ${props => props.theme.colors.text};
@@ -148,6 +157,16 @@ const ChartContainer = styled.div`
   .recharts-legend-text {
     color: ${props => props.theme.colors.text} !important;
   }
+  
+  /* Fix for chart dimensions */
+  .recharts-wrapper {
+    width: 100% !important;
+    height: 100% !important;
+  }
+  
+  .recharts-surface {
+    overflow: visible;
+  }
 `;
 
 const TrendingList = styled.div`
@@ -156,6 +175,7 @@ const TrendingList = styled.div`
   gap: ${props => props.theme.spacing.sm};
   max-height: 300px;
   overflow-y: auto;
+  width: 100%; /* Ensure full width */
 `;
 
 const TrendingItem = styled(motion.div)`
@@ -164,6 +184,7 @@ const TrendingItem = styled(motion.div)`
   padding: ${props => props.theme.spacing.md};
   border-left: 3px solid ${props => props.color || props.theme.colors.accent};
   transition: all ${props => props.theme.animations.fast};
+  width: 100%; /* Ensure full width */
   
   &:hover {
     background: rgba(255, 255, 255, 0.1);
@@ -207,6 +228,7 @@ const RecommendationCard = styled(motion.div)`
   margin-bottom: ${props => props.theme.spacing.md};
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all ${props => props.theme.animations.fast};
+  width: 100%; /* Ensure full width */
   
   &:hover {
     background: rgba(255, 255, 255, 0.1);
@@ -266,6 +288,7 @@ const EmptyState = styled.div`
   height: 200px;
   color: ${props => props.theme.colors.textSecondary};
   text-align: center;
+  width: 100%; /* Ensure full width */
   
   .empty-icon {
     font-size: 3rem;
@@ -310,6 +333,7 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
     return null;
   };
 
+  // Process data for chart rendering
   const processedData = useMemo(() => {
     if (!data) return null;
   
@@ -318,7 +342,7 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
         return {
           totalContent: stats?.total_content || 0,
           vectorEnabled: stats?.total_content || 0, // Assuming all content has vectors
-          avgQuality: stats?.avg_quality || 0,
+          avgQuality: stats?.average_quality || 0,
           clusters: stats?.content_clusters || 0
         };
   
@@ -327,6 +351,7 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
         const entries = Object.entries(data);
         if (entries.length === 0) return [];
         
+        // Format data for pie chart
         return entries.map(([type, count], index) => ({
           name: type,
           value: count,
@@ -426,17 +451,19 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
           );
         }
         
+        // Fixed chart rendering with proper dimensions and responsive container
         return (
           <ChartContainer>
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
+              <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                 <Pie
                   data={processedData}
                   cx="50%"
                   cy="50%"
-                  outerRadius={60}
+                  outerRadius={80}
                   fill="#8884d8"
                   dataKey="value"
+                  nameKey="name"
                   label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   labelLine={false}
                 >
@@ -445,6 +472,7 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
                   ))}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
+                <Legend />
               </PieChart>
             </ResponsiveContainer>
           </ChartContainer>
@@ -622,6 +650,7 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3 }}
+            style={{ width: '100%' }} /* Ensure full width */
           >
             <PanelContent>
               {renderContent()}

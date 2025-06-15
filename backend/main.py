@@ -23,9 +23,9 @@ from bs4 import BeautifulSoup
 from openai import OpenAI
 from groq import Groq
 
-# Add these new imports for LangChain
-from langchain.chat_models import ChatOpenAI
-from langchain.embeddings import OpenAIEmbeddings
+# Add LangChain imports
+from langchain_community.chat_models import ChatOpenAI
+from langchain_community.embeddings import OpenAIEmbeddings
 
 import asyncio
 import json
@@ -34,10 +34,8 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from collections import defaultdict, Counter
 import numpy as np
-from sklearn.cluster import DBSCAN
-from sklearn.metrics.pairwise import cosine_similarity
 
-# Import the cleaned RAG chatbot
+# Import the fixed RAG chatbot and Supabase DB
 from rag_chatbot import RAGChatbot, ChatRequest, ChatResponse, ChatMessage
 from supabase_db import SimpleVectorDB, ContentItem, init_db
 
@@ -396,6 +394,13 @@ async def process_urls(items: List[HistoryItem]) -> Dict[str, int]:
                 content_hash=processed_item['content_hash']
             )
             
+            # Also generate and store embedding
+            embedding = await db.generate_embedding(
+                f"{content_item.title} {content_item.summary}", 
+                use_openai=bool(OPENAI_API_KEY)
+            )
+            content_item.embedding = embedding
+            
             success = await db.store_content(content_item)
             if success:
                 stored_count += 1
@@ -419,7 +424,9 @@ from contextlib import asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     global db, rag_chatbot
-    db = await init_db()
+    
+    # Initialize database with OpenAI API key for embeddings
+    db = await init_db(OPENAI_API_KEY)
     
     # Initialize RAG chatbot with better error handling
     try:
@@ -545,17 +552,19 @@ async def get_chat_context(query: str, limit: int = 5, threshold: float = 0.3):
         raise HTTPException(status_code=503, detail="RAG chatbot not available")
     
     try:
-        context_items = await rag_chatbot._retrieve_relevant_context(query, limit, threshold)
+        # Get the documents from the vector database
+        docs = await db.get_documents_by_query(query, limit, threshold)
         
         formatted_context = []
-        for item in context_items:
+        for doc in docs:
             formatted_context.append({
-                "title": item.title,
-                "summary": item.summary,
-                "content_type": item.content_type,
-                "quality_score": item.quality_score,
-                "similarity": round(item.similarity, 3),
-                "url": item.url
+                "title": doc.metadata.get("title", "Unknown"),
+                "summary": doc.metadata.get("summary", ""),
+                "content_type": doc.metadata.get("content_type", "Unknown"),
+                "quality_score": doc.metadata.get("quality_score", 0),
+                "similarity": round(doc.metadata.get("similarity", 0), 3),
+                "url": doc.metadata.get("url", ""),
+                "content_preview": doc.page_content[:200] + "..." if len(doc.page_content) > 200 else doc.page_content
             })
         
         return {
@@ -573,7 +582,7 @@ async def chat_health_check():
     try:
         openai_ok = bool(OPENAI_API_KEY)
         rag_ok = rag_chatbot is not None
-        vector_ok = rag_chatbot and rag_chatbot.vector_store is not None if rag_chatbot else False
+        vector_ok = db is not None
         
         try:
             test_query = db.client.table('processed_content').select('id').limit(1).execute()
@@ -581,7 +590,18 @@ async def chat_health_check():
         except:
             db_ok = False
         
-        status = "healthy" if all([openai_ok, rag_ok, db_ok]) else "degraded"
+        # Try to get an embedding to verify the LangChain integration is working
+        embeddings_ok = False
+        if openai_ok:
+            try:
+                embedder = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+                embedding = embedder.embed_query("test")
+                embeddings_ok = len(embedding) > 0
+            except Exception as e:
+                logger.error(f"Embedding test failed: {e}")
+                embeddings_ok = False
+        
+        status = "healthy" if all([openai_ok, rag_ok, db_ok, embeddings_ok]) else "degraded"
         
         return {
             "status": status,
@@ -589,7 +609,8 @@ async def chat_health_check():
                 "openai_api": "ok" if openai_ok else "error",
                 "rag_chatbot": "ok" if rag_ok else "error", 
                 "vector_store": "ok" if vector_ok else "error",
-                "database": "ok" if db_ok else "error"
+                "database": "ok" if db_ok else "error",
+                "embeddings": "ok" if embeddings_ok else "error"
             },
             "timestamp": datetime.now().isoformat()
         }
@@ -797,6 +818,13 @@ async def health_check():
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         }
+
+# Mount static files for frontend
+try:
+    app.mount("/static", StaticFiles(directory="frontend/build"), name="static")
+    logger.info("✅ Static files mounted")
+except Exception as e:
+    logger.warning(f"⚠️ Static files not mounted: {e}")
 
 @app.get("/")
 async def root():

@@ -107,7 +107,6 @@ const AppContainer = styled.div`
   grid-template-rows: 1fr 300px;
   gap: ${props => props.theme.spacing.md};
   padding: ${props => props.theme.spacing.md};
-  overflow: hidden; /* Prevent page-level scrolling */
   
   @media (max-width: 1400px) {
     grid-template-columns: 300px 1fr 300px;

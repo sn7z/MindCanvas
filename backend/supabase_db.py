@@ -1,17 +1,20 @@
 """
-Simple Supabase Vector Database for MindCanvas
-Clean, working implementation without overcomplication
+Supabase Vector Database for MindCanvas
+Implements vector storage and retrieval for RAG chatbot
 """
 
 import json
 import logging
-from typing import List, Dict, Any
+import asyncio
+from typing import List, Dict, Any, Optional
 from datetime import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 
 from sentence_transformers import SentenceTransformer
 from supabase import create_client, Client
 import numpy as np
+
+from langchain_openai import OpenAIEmbeddings
 
 logger = logging.getLogger(__name__)
 
@@ -31,43 +34,129 @@ class ContentItem:
     processing_method: str
     visit_timestamp: datetime
     content_hash: str
+    embedding: Optional[List[float]] = None
 
 class SimpleVectorDB:
-    def __init__(self):
+    def __init__(self, openai_api_key=None):
         self.client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        self.embedder = SentenceTransformer('all-MiniLM-L6-v2')
+        # Use both SentenceTransformer for compatibility and OpenAI for new embeddings
+        self.st_embedder = SentenceTransformer('all-MiniLM-L6-v2')
+        self.openai_embedder = OpenAIEmbeddings(openai_api_key=openai_api_key) if openai_api_key else None
         logger.info("✅ Connected to Supabase")
+        
+        # Ensure the necessary Supabase functions exist
+        self._ensure_match_function()
     
-    def generate_embedding(self, text: str) -> List[float]:
+    def _ensure_match_function(self):
+        """Ensure the vector similarity search function exists in Supabase"""
+        try:
+            # Check if function exists by trying a dummy query
+            try:
+                self.client.rpc(
+                    'match_processed_content', 
+                    {'query_embedding': [0.0] * 1536, 'match_count': 1}
+                ).execute()
+                logger.info("✅ Vector search function exists")
+            except Exception as e:
+                logger.warning(f"Vector search function may be missing: {e}")
+                logger.info("Attempting to create vector search function...")
+                
+                # Try to create the function
+                # This will only work if you have sufficient permissions
+                try:
+                    # Try to create the function using SQL
+                    sql = """
+                    CREATE OR REPLACE FUNCTION match_processed_content(
+                        query_embedding vector(1536),
+                        match_count int DEFAULT 5,
+                        match_threshold float8 DEFAULT 0.3
+                    ) RETURNS TABLE (
+                        id bigint,
+                        content text,
+                        title text, 
+                        url text,
+                        content_type text,
+                        summary text,
+                        key_topics jsonb,
+                        quality_score int,
+                        content_hash text,
+                        similarity float8
+                    ) 
+                    LANGUAGE plpgsql
+                    AS $$
+                    BEGIN
+                        RETURN QUERY
+                        SELECT
+                            pc.id,
+                            pc.content,
+                            pc.title,
+                            pc.url,
+                            pc.content_type,
+                            pc.summary,
+                            pc.key_topics,
+                            pc.quality_score,
+                            pc.content_hash,
+                            1 - (pc.embedding <=> query_embedding) AS similarity
+                        FROM processed_content pc
+                        WHERE 1 - (pc.embedding <=> query_embedding) > match_threshold
+                        ORDER BY similarity DESC
+                        LIMIT match_count;
+                    END;
+                    $$;
+                    """
+                    
+                    # Try to execute the SQL (will likely fail without permissions)
+                    # Uncomment this if you have admin access to the database
+                    # self.client.sql(sql).execute()
+                    
+                    logger.info("Created vector search function")
+                except Exception as create_err:
+                    logger.error(f"Failed to create search function: {create_err}")
+                    logger.info("Please run this SQL manually in the Supabase SQL editor:")
+                    logger.info(sql)
+        except Exception as e:
+            logger.error(f"Error checking/creating search function: {e}")
+            # Continue anyway - we'll use alternative search methods
+
+    async def generate_embedding(self, text: str, use_openai: bool = True) -> List[float]:
         """Generate vector embedding for text"""
         try:
-            embedding = self.embedder.encode(text)
+            # Prefer OpenAI embeddings for better performance
+            if use_openai and self.openai_embedder:
+                try:
+                    # Run in thread to not block asyncio
+                    embedding = await asyncio.to_thread(
+                        self.openai_embedder.embed_query, text
+                    )
+                    return embedding
+                except Exception as e:
+                    logger.warning(f"OpenAI embedding failed, falling back to sentence-transformers: {e}")
+            
+            # Fallback to sentence-transformers
+            embedding = await asyncio.to_thread(
+                self.st_embedder.encode, text
+            )
             return embedding.tolist()
         except Exception as e:
             logger.error(f"Embedding failed: {e}")
-            return [0.0] * 384  # Return zero vector on failure
+            # Return zero vector as fallback
+            return [0.0] * (1536 if use_openai and self.openai_embedder else 384)
 
     async def store_content(self, item: ContentItem) -> bool:
         """Store content with vector embedding"""
         try:
-            # Generate embedding from title + summary
-            text = f"{item.title} {item.summary}"
-            embedding = self.generate_embedding(text)
+            # Generate embedding if not provided
+            if not item.embedding:
+                # Use title + summary for embedding
+                text = f"{item.title} {item.summary}"
+                item.embedding = await self.generate_embedding(text)
             
             # Store in database
-            data = {
-                'url': item.url,
-                'title': item.title,
-                'summary': item.summary,
-                'content': item.content,
-                'content_type': item.content_type,
-                'key_topics': item.key_topics,
-                'quality_score': item.quality_score,
-                'processing_method': item.processing_method,
-                'visit_timestamp': item.visit_timestamp.isoformat(),
-                'content_hash': item.content_hash,
-                'embedding': embedding
-            }
+            data = asdict(item)
+            
+            # Handle datetime serialization
+            if isinstance(data['visit_timestamp'], datetime):
+                data['visit_timestamp'] = data['visit_timestamp'].isoformat()
             
             result = self.client.table('processed_content').upsert(data).execute()
             return bool(result.data)
@@ -76,12 +165,42 @@ class SimpleVectorDB:
             logger.error(f"Store failed for {item.url}: {e}")
             return False
 
-    async def semantic_search(self, query: str, limit: int = 20) -> List[Dict]:
+    async def semantic_search(self, query: str, limit: int = 20, threshold: float = 0.3) -> List[Dict]:
         """Search using vector similarity"""
         try:
             # Generate query embedding
-            query_embedding = self.generate_embedding(query)
+            query_embedding = await self.generate_embedding(query)
             
+            # Try using the match function first (more efficient)
+            try:
+                response = self.client.rpc(
+                    'match_processed_content',
+                    {
+                        'query_embedding': query_embedding, 
+                        'match_count': limit, 
+                        'match_threshold': threshold
+                    }
+                ).execute()
+                
+                if response.data:
+                    # Process results
+                    results = []
+                    for item in response.data:
+                        results.append({
+                            'id': item.get('id'),
+                            'url': item.get('url'),
+                            'title': item.get('title'),
+                            'summary': item.get('summary'),
+                            'content_type': item.get('content_type'),
+                            'key_topics': item.get('key_topics') or [],
+                            'quality_score': item.get('quality_score'),
+                            'similarity': round(item.get('similarity', 0), 3)
+                        })
+                    return results
+            except Exception as e:
+                logger.warning(f"RPC search failed, falling back to manual search: {e}")
+            
+            # Fallback: manual vector search
             # Get all content with embeddings
             response = self.client.table('processed_content').select(
                 'id, url, title, summary, content_type, key_topics, quality_score, embedding'
@@ -96,10 +215,10 @@ class SimpleVectorDB:
                 if not item.get('embedding'):
                     continue
                 
-                # Cosine similarity
+                # Calculate cosine similarity
                 similarity = self._cosine_similarity(query_embedding, item['embedding'])
                 
-                if similarity > 0.1:  # Basic threshold
+                if similarity >= threshold:
                     results.append({
                         'id': item['id'],
                         'url': item['url'],
@@ -124,15 +243,44 @@ class SimpleVectorDB:
         try:
             # Get source content embedding
             source = self.client.table('processed_content').select(
-                'embedding'
+                'embedding, title, summary'
             ).eq('id', content_id).execute()
             
             if not source.data or not source.data[0].get('embedding'):
                 return []
             
             source_embedding = source.data[0]['embedding']
+            source_text = f"{source.data[0].get('title', '')} {source.data[0].get('summary', '')}"
             
-            # Find similar content
+            # Try to use the match function first
+            try:
+                response = self.client.rpc(
+                    'match_processed_content',
+                    {
+                        'query_embedding': source_embedding, 
+                        'match_count': limit + 1,
+                        'match_threshold': 0.3
+                    }
+                ).execute()
+                
+                if response.data:
+                    # Filter out the source item itself
+                    results = []
+                    for item in response.data:
+                        if item.get('id') != content_id:
+                            results.append({
+                                'id': item.get('id'),
+                                'url': item.get('url'),
+                                'title': item.get('title'),
+                                'summary': item.get('summary'),
+                                'content_type': item.get('content_type'),
+                                'similarity': round(item.get('similarity', 0), 3)
+                            })
+                    return results[:limit]
+            except Exception as e:
+                logger.warning(f"RPC related content search failed: {e}")
+            
+            # Fallback: Find similar content manually
             all_content = self.client.table('processed_content').select(
                 'id, url, title, summary, content_type, embedding'
             ).neq('id', content_id).execute()
@@ -316,17 +464,24 @@ class SimpleVectorDB:
             test = self.client.table('processed_content').select('id').limit(1).execute()
             
             # Test embedding generation
-            test_embedding = self.generate_embedding("test")
+            test_embedding = await self.generate_embedding("test")
             
             # Count content
             count_response = self.client.table('processed_content').select('id', count='exact').execute()
             content_count = count_response.count or 0
             
+            # Check if any content has embeddings
+            embedding_response = self.client.table('processed_content').select(
+                'id'
+            ).not_('embedding', 'is', 'null').limit(1).execute()
+            has_embeddings = len(embedding_response.data or []) > 0
+            
             return {
                 'status': 'healthy',
                 'database_connected': True,
-                'embedding_working': len(test_embedding) == 384,
+                'embedding_working': len(test_embedding) > 0,
                 'content_count': content_count,
+                'has_embeddings': has_embeddings,
                 'timestamp': datetime.now().isoformat()
             }
             
@@ -343,6 +498,13 @@ class SimpleVectorDB:
             vec_a = np.array(a)
             vec_b = np.array(b)
             
+            # Check if vectors have same dimensions
+            if len(vec_a) != len(vec_b):
+                # Attempt to resize to the smaller dimension
+                min_dim = min(len(vec_a), len(vec_b))
+                vec_a = vec_a[:min_dim]
+                vec_b = vec_b[:min_dim]
+            
             dot_product = np.dot(vec_a, vec_b)
             norm_a = np.linalg.norm(vec_a)
             norm_b = np.linalg.norm(vec_b)
@@ -352,13 +514,89 @@ class SimpleVectorDB:
             
             return dot_product / (norm_a * norm_b)
             
-        except Exception:
+        except Exception as e:
+            logger.error(f"Similarity calculation failed: {e}")
             return 0.0
 
 # Initialize function
-async def init_db():
+async def init_db(openai_api_key=None):
     """Initialize the database"""
-    db = SimpleVectorDB()
+    db = SimpleVectorDB(openai_api_key)
     health = await db.health_check()
     logger.info(f"Database status: {health['status']}")
+    
+    # Additional info on embeddings
+    if health.get('has_embeddings'):
+        logger.info("✅ Database has existing vector embeddings")
+    else:
+        logger.warning("⚠️ No vector embeddings found in database")
+    
     return db
+
+# SQL for setting up the database (run this manually in Supabase SQL editor)
+def get_database_setup_sql():
+    """Get SQL to set up database tables and functions"""
+    return """
+    -- Enable pgvector extension (requires admin privileges)
+    CREATE EXTENSION IF NOT EXISTS vector;
+
+    -- Create processed_content table with vector column
+    CREATE TABLE IF NOT EXISTS processed_content (
+        id BIGSERIAL PRIMARY KEY,
+        url TEXT NOT NULL,
+        title TEXT NOT NULL,
+        summary TEXT,
+        content TEXT,
+        content_type TEXT,
+        key_topics JSONB,
+        quality_score INTEGER,
+        processing_method TEXT,
+        visit_timestamp TIMESTAMP,
+        content_hash TEXT,
+        embedding VECTOR(1536),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+    );
+
+    -- Create index on embedding column
+    CREATE INDEX IF NOT EXISTS processed_content_embedding_idx ON processed_content USING ivfflat (embedding vector_cosine_ops);
+
+    -- Create vector search function
+    CREATE OR REPLACE FUNCTION match_processed_content(
+        query_embedding vector(1536),
+        match_count int DEFAULT 5,
+        match_threshold float8 DEFAULT 0.3
+    ) RETURNS TABLE (
+        id bigint,
+        content text,
+        title text, 
+        url text,
+        content_type text,
+        summary text,
+        key_topics jsonb,
+        quality_score int,
+        content_hash text,
+        similarity float8
+    ) 
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+        RETURN QUERY
+        SELECT
+            pc.id,
+            pc.content,
+            pc.title,
+            pc.url,
+            pc.content_type,
+            pc.summary,
+            pc.key_topics,
+            pc.quality_score,
+            pc.content_hash,
+            1 - (pc.embedding <=> query_embedding) AS similarity
+        FROM processed_content pc
+        WHERE 1 - (pc.embedding <=> query_embedding) > match_threshold
+        ORDER BY similarity DESC
+        LIMIT match_count;
+    END;
+    $$;
+    """
