@@ -2,7 +2,17 @@
 
 Transform your browsing history into an intelligent, searchable knowledge network. MindCanvas uses AI to analyze your web content, extract relationships, and create an interactive knowledge graph you can explore and query.
 
-## Features
+## 🎯 Problem Statement
+
+In our information-rich digital age, we consume vast amounts of content daily through browsing, reading articles, tutorials, and documentation. However, this knowledge remains scattered and disconnected, making it nearly impossible to:
+- Discover relationships between different topics you've learned
+- Recall and build upon previous knowledge effectively  
+- Identify knowledge gaps in your learning journey
+- Leverage AI to understand and connect your personal knowledge
+
+MindCanvas solves this by transforming your browsing history into an intelligent, searchable knowledge network powered by AI.
+
+## ✨ Features
 
 - **AI Content Analysis**: Extracts topics, summaries, and quality scores using GPT-4/Groq
 - **Knowledge Graph**: Interactive visualization with multiple layout algorithms
@@ -10,7 +20,37 @@ Transform your browsing history into an intelligent, searchable knowledge networ
 - **RAG Chatbot**: Ask questions about your knowledge in natural language
 - **Chrome Extension**: One-click history export and processing
 
-## Requirements
+![Screenshot 2025-06-15 161810](https://github.com/user-attachments/assets/caa5c41a-64b6-4cf8-9403-c99c79f8e06f)
+
+![Screenshot 2025-06-15 161905](https://github.com/user-attachments/assets/c49dd078-de26-4bf1-b72d-b0167caf73f2)
+
+![Screenshot 2025-06-15 161836](https://github.com/user-attachments/assets/185fbfbb-2a68-4826-b3c5-e176a356b783)
+
+## 🏗️ Architecture
+
+### Backend Stack
+- **FastAPI**: High-performance Python web framework
+- **Supabase**: Vector database with pgvector for embeddings
+- **LangChain**: LLM orchestration and RAG implementation
+- **Multiple AI Providers**: OpenAI GPT-4, Groq Llama models
+
+### Frontend Stack
+- **React 18**: Modern component-based UI
+- **Cytoscape.js**: Advanced graph visualization
+- **Framer Motion**: Smooth animations and transitions
+- **Styled Components**: Dynamic theming and responsive design
+
+### Browser Extension
+- **Manifest V3**: Modern Chrome extension
+- **Privacy-First**: All data processing happens locally
+- **Batch Processing**: Efficient history export and processing
+
+### Processing Pipeline
+```
+📄 Raw Content → 🧠 LLM Analysis → 📊 Quality Scoring → 🔗 Relationship Mapping
+```
+
+## 📦 Requirements
 
 - Python 3.8+
 - Node.js 16+
@@ -18,13 +58,13 @@ Transform your browsing history into an intelligent, searchable knowledge networ
 - OpenAI API key (required)
 - Groq API key (optional)
 
-## Installation (Windows)
+## 🚀 Installation (Windows)
 
 ### 1. Clone Repository
 
 ```cmd
-git clone https://github.com/yourusername/mindcanvas.git
-cd mindcanvas
+git clone https://github.com/yourusername/MindCanvas.git
+cd MindCanvas
 ```
 
 ### 2. Backend Setup
@@ -34,7 +74,7 @@ cd backend
 pip install -r requirements.txt
 ```
 
-Create `.env` file in `backend` folder:
+Create `.env` file in `backend` folder or set in the System Env Vars:
 
 ```env
 OPENAI_API_KEY=your_openai_api_key_here
@@ -69,7 +109,7 @@ Frontend runs on `http://localhost:3000`
 4. Select the `extension` folder from this project
 5. Pin the extension to toolbar
 
-## Usage
+## 💡 Usage
 
 ### Export Your History
 
@@ -91,7 +131,49 @@ Frontend runs on `http://localhost:3000`
 - **Text Search**: "React hooks"
 - **Chat Queries**: "What have I learned about Python?"
 
-## API Endpoints
+## 🎯 Use Cases
+
+### For Students & Researchers
+- Track research across multiple domains
+- Discover connections between different papers/topics
+- Build comprehensive knowledge maps for thesis work
+
+### For Developers & Engineers
+- Connect technical concepts across frameworks
+- Build learning paths for new technologies
+- Maintain awareness of evolving best practices
+
+### For Content Creators & Writers
+- Organize research for articles and content
+- Find gaps in coverage for new content ideas
+- Track evolution of ideas and topics over time
+
+### For Lifelong Learners
+- Visualize learning journey across disciplines
+- Identify knowledge gaps and learning opportunities
+- Build personal expertise maps
+
+## 🔧 Advanced Features
+
+### RAG-Powered Chatbot
+```typescript
+// Natural language queries about your knowledge
+"What have I learned about React performance?"
+"Show me connections between AI and design"
+"What should I learn next in machine learning?"
+```
+
+### Export & Integration
+- **Multiple Formats**: JSON, CSV, graph formats
+- **API Access**: RESTful endpoints for external integrations
+- **Knowledge Graph Export**: Use your data in other tools
+
+### Privacy & Security
+- **Local Processing**: All analysis happens on your machine
+- **No Data Sharing**: Your browsing history stays private
+- **Open Source**: Full transparency and customization
+
+## 🔗 API Endpoints
 
 - `POST /api/ingest` - Process browser history
 - `POST /api/chat` - Chat with knowledge base
@@ -99,7 +181,20 @@ Frontend runs on `http://localhost:3000`
 - `POST /api/search/semantic` - Vector search
 - `GET /api/knowledge-graph/export` - Export graph data
 
-## Database Setup (Optional)
+## ⚙️ Configuration
+
+### API Keys Required
+- **OpenAI API Key**: For GPT-4 processing and embeddings
+- **Groq API Key**: For Llama model processing (optional)
+- **Supabase Credentials**: For vector database storage
+
+### Customization Options
+- **Graph Layouts**: Force-directed, hierarchical, circular, grid
+- **Processing Models**: Choose between OpenAI, Groq, or hybrid
+- **Quality Thresholds**: Filter content by quality scores
+- **Refresh Intervals**: Automatic data synchronization settings
+
+## 🗄️ Database Setup (Optional)
 
 For production, set up Supabase:
 
@@ -110,46 +205,7 @@ For production, set up Supabase:
 
 Default: Uses file-based storage
 
-## Configuration
-
-Edit `backend/main.py`:
-
-- `MAX_CONTENT_LENGTH`: Content truncation limit
-- `BATCH_SIZE`: Processing batch size
-- `EXCLUDED_DOMAINS`: Domains to ignore
-
-Edit `frontend/src/App.js`:
-
-- Theme colors and layout options
-- Graph visualization settings
-
-## Troubleshooting
-
-**Backend won't start:**
-
-- Check Python version: `python --version`
-- Install dependencies: `pip install -r requirements.txt`
-- Verify API keys in `.env` file
-
-**Frontend errors:**
-
-- Check Node version: `node --version`
-- Clear cache: `npm cache clean --force`
-- Reinstall: `rmdir /s node_modules && npm install`
-
-**Extension not working:**
-
-- Check extension is enabled in Chrome
-- Verify backend is running on port 8090
-- Check browser console for errors
-
-**No graph data:**
-
-- Export history using Chrome extension first
-- Check backend logs for processing errors
-- Verify API keys are working
-
-## Development
+## 🛠️ Development
 
 ### Add New Content Types
 
@@ -169,16 +225,52 @@ Edit `frontend/src/App.js`:
 2. Implement custom node rendering
 3. Add new interaction modes
 
-## Architecture
+## 🐛 Troubleshooting
 
+**Backend won't start:**
+- Check Python version: `python --version`
+- Install dependencies: `pip install -r requirements.txt`
+- Verify API keys in `.env` file
+
+**Frontend errors:**
+- Check Node version: `node --version`
+- Clear cache: `npm cache clean --force`
+- Reinstall: `rmdir /s node_modules && npm install`
+
+**Extension not working:**
+- Check extension is enabled in Chrome
+- Verify backend is running on port 8090
+- Check browser console for errors
+
+**No graph data:**
+- Export history using Chrome extension first
+- Check backend logs for processing errors
+- Verify API keys are working
+
+## 📊 Sample Output
+
+```json
+{
+  "knowledge_graph": {
+    "nodes": 1247,
+    "connections": 3891,
+    "topics_identified": 89,
+    "quality_average": 7.3
+  },
+  "insights": {
+    "top_interests": ["Machine Learning", "React Development", "System Design"],
+    "knowledge_gaps": ["Backend Architecture", "Database Design"],
+    "learning_velocity": "12 new concepts/week"
+  }
+}
 ```
-┌─ Chrome Extension ─┐    ┌─ FastAPI Backend ─┐    ┌─ React Frontend ─┐
-│ • History Export   │───▶│ • AI Processing   │───▶│ • Graph Viz      │
-│ • Privacy-First    │    │ • Vector DB       │    │ • Search/Chat    │
-└────────────────────┘    │ • RAG System     │    │ • Analytics      │
-                          └───────────────────┘    └──────────────────┘
-```
 
-## License
+## 🌟 Why MindCanvas?
 
-MIT License - see LICENSE file for details.
+Transform passive browsing into active knowledge building. MindCanvas doesn't just store your data—it helps you understand it, connect it, and leverage it for continuous learning and discovery.
+
+Built for the AI age: Designed from the ground up to leverage modern AI capabilities for knowledge work, making your personal information as powerful as your professional tools.
+
+---
+
+*Ready to visualize your knowledge? Start building your personal knowledge graph today.*
