@@ -643,21 +643,21 @@ const App = () => {
           style={{ gridArea: 'left-panel' }}
         >
           <StatisticsPanel
-            title="📊 Overview"
+            title=" Overview"
             type="overview"
             data={overviewStats}
             stats={stats}
           />
 
           <StatisticsPanel
-            title="🎯 Content Types"
+            title=" Content Types"
             type="contentTypes"
             data={contentTypeData}
           />
 
           {trendingData.length > 0 && (
             <StatisticsPanel
-              title="🔥 Trending Topics"
+              title="📁 Categories"
               type="trending"
               trending={trendingData}
             />
@@ -753,7 +753,7 @@ const App = () => {
           </PanelHeaderTitle>
           {recommendationsData.length > 0 && (
             <StatisticsPanel
-              title="💡 Recommendations"
+              title=" Recommendations"
               type="recommendations"
               data={recommendationsData}
             />

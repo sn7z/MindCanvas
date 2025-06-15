@@ -9,7 +9,7 @@ const ChatContainer = styled.div`
   display: flex;
   flex-direction: column;
   background: linear-gradient(135deg, 
-    rgba(102, 126, 234, 0.1) 0%, 
+    rgba(102, 126, 234, 0.1) 0%, R
     rgba(118, 75, 162, 0.1) 100%);
   border-radius: ${props => props.theme.borderRadius.lg};
   overflow: hidden;

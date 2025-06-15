@@ -16,8 +16,8 @@ const PanelContainer = styled(motion.div)`
   border: 1px solid ${props => props.theme.colors.border};
   overflow: hidden;
   box-shadow: ${props => props.theme.shadows.md};
-  height: fit-content;
-  min-height: 300px;
+  height: fit-content; /* Allows shrinking to content size */
+  /* min-height: 300px; // Removed to allow full collapse */
   width: 100%; /* Ensure full width */
   max-width: 100%; /* Prevent overflow */
 `;
@@ -68,8 +68,8 @@ const ActionButton = styled(motion.button)`
 
 const PanelContent = styled.div`
   padding: ${props => props.theme.spacing.lg};
-  height: 100%;
-  min-height: 200px;
+  /* height: 100%; // Removed as parent div animates height to 'auto' */
+  /* min-height: 200px; // Removed to allow full collapse */
   width: 100%; /* Ensure full width */
 `;
 
