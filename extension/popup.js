@@ -71,7 +71,7 @@ async function handleExportClick() {
  * Handle dashboard button click
  */
 function handleDashboardClick() {
-    chrome.tabs.create({ url: 'http://localhost:8090/static/index.html' });
+    chrome.tabs.create({ url: 'http://localhost:3000' });
 }
 
 /**

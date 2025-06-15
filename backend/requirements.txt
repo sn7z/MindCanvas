@@ -1,19 +1,20 @@
-httpx
 beautifulsoup4
-lxml
-numpy
 crawl4ai
-sentence-transformers
-groq
-openai
-supabase
-uvicorn
 fastapi
-pip install langchain
-pip install langchain-community
-pip install tiktoken
-pip install openai
-pip install fastapi uvicorn supabase sentence-transformers
-pip install openai groq beautifulsoup4 httpx pydantic
-pip install numpy scikit-learn python-multipart
-pip install python-dotenv logging asyncio
+groq
+httpx
+lxml
+langchain
+langchain-community
+langchain-openai
+langchain-text-splitters
+numpy
+openai
+pydantic
+python-dotenv
+python-multipart
+scikit-learn
+sentence-transformers
+supabase
+tiktoken
+uvicorn
