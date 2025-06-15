@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>MindCanvas History Exporter</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+:root {
+  --bg-main: #1b1f24;
+  --bg-surface: #232931;
+  --accent: #3a8fd0;
+  --accent-hover: #5aa1dd;
+  --text-primary: #f1f3f5;
+  --text-muted: rgba(241, 243, 245, 0.6);
+  --radius: 12px;
+  --transition: 0.25s ease;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 350px;
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* Header */
+.header {
+  background-color: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  padding: 20px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.header h1 {
+  font-size: 1.5rem;
+  color: var(--accent);
+}
+
+.header p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* Content */
+.content {
+  padding: 20px;
+}
+
+.status-section {
+  background-color: var(--bg-surface);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.status-text {
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+  color: var(--text-primary);
+}
+
+.progress-container {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  height: 6px;
+  overflow: hidden;
+  margin-bottom: 8px;
+  display: none;
+}
+
+.progress-bar {
+  background: var(--accent);
+  height: 100%;
+  width: 0%;
+  transition: width var(--transition);
+  border-radius: 6px;
+}
+
+.stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Buttons */
+.btn {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+  background-color: var(--accent);
+  margin-bottom: 12px;
+}
+
+.btn:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
+}
+
+.btn:disabled {
+  background-color: #444;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Alerts */
+.alert {
+  padding: 10px;
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.alert-success {
+  background: rgba(56, 178, 172, 0.1);
+  color: #38b2ac;
+  border: 1px solid rgba(56, 178, 172, 0.2);
+}
+
+.alert-error {
+  background: rgba(245, 101, 101, 0.1);
+  color: #f56565;
+  border: 1px solid rgba(245, 101, 101, 0.2);
+}
+
+.alert-info {
+  background: rgba(66, 153, 225, 0.1);
+  color: #4299e1;
+  border: 1px solid rgba(66, 153, 225, 0.2);
+}
+
+/* Footer */
+.footer {
+  padding: 14px 20px;
+  background-color: rgba(255, 255, 255, 0.03);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>🧠 MindCanvas</h1>
+        <p>History Exporter</p>
+    </div>
+
+    <div class="content">
+        <div class="status-section">
+            <div class="status-text" id="statusText">Ready to export your browsing history</div>
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="stats" id="statsContainer">
+                <span id="statsText">Click Export to begin</span>
+            </div>
+        </div>
+
+        <div id="alertContainer"></div>
+
+        <button class="btn btn-primary" id="exportHistory">
+            Export History (24h)
+        </button>
+
+        <button class="btn btn-secondary" id="openDashboard">
+            Open Dashboard
+        </button>
+    </div>
+
+    <div class="footer">
+        <div>Processing with AI • Secure & Private</div>
+    </div>
+
+    <script type="module" src="popup.js"></script>
+</body>
+
+</html>
