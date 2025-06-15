@@ -341,9 +341,9 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
       case 'overview':
         return {
           totalContent: stats?.total_content || 0,
-          vectorEnabled: stats?.total_content || 0, // Assuming all content has vectors
+          vectorEnabled: stats?.vector_enabled || 0,
           avgQuality: stats?.average_quality || 0,
-          clusters: stats?.content_clusters || 0
+          clusters: stats?.content_clusters || 0,
         };
   
       case 'contentTypes':
@@ -365,13 +365,14 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
           count: count
         }));
   
-      case 'analytics':
-        if (!data || typeof data !== 'object') return null;
+      case 'graphAnalytics': // Changed from 'analytics'
+        if (!data || typeof data !== 'object') return { nodeCount: 0, edgeCount: 0, avgConnections: '0.0' };
+        const nodeCount = data.nodeCount || 0;
+        const edgeCount = data.edgeCount || 0;
         return {
-          nodeCount: data.nodeCount || 0,
-          edgeCount: data.edgeCount || 0,
-          avgConnections: data.avgConnections || 0,
-          clusters: data.clusters || 0
+          nodeCount: nodeCount,
+          edgeCount: edgeCount,
+          avgConnections: nodeCount > 0 ? (edgeCount / nodeCount).toFixed(1) : '0.0'
         };
   
       case 'recommendations':
@@ -479,7 +480,8 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
         );
   
       case 'analytics':
-        if (!data || typeof data !== 'object') {
+      case 'graphAnalytics': // Changed from 'analytics'
+        if (!processedData) {
           return (
             <EmptyState>
               <div className="empty-icon">📈</div>
@@ -500,7 +502,7 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
               <div className="stat-header">
                 <span className="icon">🔗</span>
               </div>
-              <div className="stat-value">{data.nodeCount || 0}</div>
+              <div className="stat-value">{processedData.nodeCount || 0}</div>
               <div className="stat-label">Graph Nodes</div>
               <div className="stat-change neutral">Network Size</div>
             </StatCard>
@@ -515,7 +517,7 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
               <div className="stat-header">
                 <span className="icon">🌐</span>
               </div>
-              <div className="stat-value">{data.edgeCount || 0}</div>
+              <div className="stat-value">{processedData.edgeCount || 0}</div>
               <div className="stat-label">Connections</div>
               <div className="stat-change neutral">Relationships</div>
             </StatCard>
@@ -530,7 +532,7 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
               <div className="stat-header">
                 <span className="icon">📊</span>
               </div>
-              <div className="stat-value">{data.avgConnections || 0}</div>
+              <div className="stat-value">{processedData.avgConnections || '0.0'}</div>
               <div className="stat-label">Avg Connections</div>
               <div className="stat-change neutral">Per Node</div>
             </StatCard>
@@ -618,9 +620,10 @@ const StatisticsPanel = ({ title, type, data, stats, trending, className, ...pro
           <span className="icon">
             {type === 'overview' && '📊'}
             {type === 'contentTypes' && '🎯'}
+            {type === 'graphAnalytics' && '📈'}
             {type === 'qualityChart' && '📈'}
             {type === 'recommendations' && '💡'}
-            {!['overview', 'contentTypes', 'qualityChart', 'recommendations'].includes(type) && '🔥'}
+            {!['overview', 'contentTypes', 'graphAnalytics', 'qualityChart', 'recommendations'].includes(type) && '🔥'}
           </span>
           {title}
         </PanelTitle>

@@ -1,5 +1,5 @@
 // src/App.js - Fixed layout with proper chatbot integration
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import styled, { ThemeProvider, createGlobalStyle } from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useKnowledgeStore } from './store/knowledgeStore';
@@ -762,62 +762,9 @@ const App = () => {
           style={{ gridArea: 'right-panel' }}
         >
           <StatisticsPanel
-            title="💡 Quick Actions"
-            type="custom"
-          >
-            <QuickActionsPanel>
-              <button 
-                className="action-button"
-                onClick={handleRefresh}
-                disabled={isLoading}
-              >
-                <span className="icon">🔄</span>
-                <span>Refresh Data</span>
-              </button>
-              
-              <button 
-                className="action-button"
-                onClick={handleExportHistory}
-              >
-                <span className="icon">📤</span>
-                <span>Export History</span>
-              </button>
-              
-              <button 
-                className="action-button"
-                onClick={() => setShowSearchOverlay(true)}
-              >
-                <span className="icon">🔍</span>
-                <span>Search Knowledge</span>
-              </button>
-              
-              <button 
-                className="action-button"
-                onClick={() => setShowSettingsPanel(true)}
-              >
-                <span className="icon">⚙️</span>
-                <span>Settings</span>
-              </button>
-              
-              <button 
-                className="action-button"
-                onClick={handleOpenDashboard}
-              >
-                <span className="icon">🌐</span>
-                <span>Open Dashboard</span>
-              </button>
-            </QuickActionsPanel>
-          </StatisticsPanel>
-
-          <StatisticsPanel
-            title="📈 Analytics"
-            type="analytics"
-            data={{
-              nodeCount: analytics.nodeCount,
-              edgeCount: analytics.edgeCount,
-              avgConnections: analytics.avgConnections,
-              clusters: analytics.clusters.length
-            }}
+            title="📈 Graph Analytics"
+            type="graphAnalytics" // Or a more generic type if preferred
+            data={analytics} // Pass raw analytics data
           />
 
           {recommendationsData.length > 0 && (
