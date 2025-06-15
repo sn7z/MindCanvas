@@ -103,56 +103,26 @@ const AppContainer = styled.div`
   min-height: 100vh;
   width: 100vw;
   display: grid;
-  grid-template-areas: 
-    "left-panel main-graph right-panel"
-    "chatbot chatbot chatbot";
-  grid-template-columns: 320px 1fr 320px;
-  grid-template-rows: 1fr 300px;
+  grid-template-areas:
+    "left-panel main-graph right-panel";
+  grid-template-columns: 360px 1fr 360px; /* Increased side panel width */
+  grid-template-rows: 1fr;
   gap: ${props => props.theme.spacing.md};
   padding: ${props => props.theme.spacing.md};
   flex-grow: 1; /* Allows AppContainer to fill #root if #root is flex */
   
   @media (max-width: 1400px) {
-    grid-template-columns: 300px 1fr 300px;
+    grid-template-columns: 320px 1fr 320px; /* Adjusted for medium screens */
   }
   
   @media (max-width: 1200px) {
     grid-template-areas: 
       "main-graph"
-      "left-panel"
-      "right-panel"
-      "chatbot";
+      "left-panel" 
+      "right-panel";
     grid-template-columns: 1fr;
-    grid-template-rows: 60vh auto auto 300px;
+    grid-template-rows: 40vh auto auto; /* Reduced graph area height */
     overflow-y: auto; /* Allow scrolling on mobile */
-  }
-`;
-
-const Header = styled(motion.div)`
-  position: fixed;
-  top: ${props => props.theme.spacing.lg};
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
-  text-align: center;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px);
-  border-radius: ${props => props.theme.borderRadius.xl};
-  padding: ${props => props.theme.spacing.lg} ${props => props.theme.spacing.xl};
-  border: 1px solid ${props => props.theme.colors.border};
-  
-  h1 {
-    font-size: 2rem;
-    margin-bottom: ${props => props.theme.spacing.sm};
-    background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  
-  .subtitle {
-    font-size: 1rem;
-    opacity: 0.9;
   }
 `;
 
@@ -172,8 +142,8 @@ const MainGraphArea = styled(motion.div)`
   min-height: 600px;
   
   @media (max-width: 1200px) {
-    min-height: 50vh;
-    height: 60vh;
+    min-height: 35vh; /* Adjusted to match grid-template-rows change */
+    height: 40vh; /* Adjusted to match grid-template-rows change */
   }
 `;
 
@@ -214,15 +184,12 @@ const SidePanel = styled(motion.div)`
 
 const ChatbotArea = styled(motion.div)`
   grid-area: chatbot;
-  background: ${props => props.theme.colors.surface};
   border-radius: ${props => props.theme.borderRadius.lg};
-  backdrop-filter: blur(20px);
-  border: 1px solid ${props => props.theme.colors.border};
-  box-shadow: ${props => props.theme.shadows.md};
-  overflow: hidden;
-  height: 300px;
-  min-height: 300px;
-  max-height: 300px;
+  overflow: hidden; /* Keep overflow hidden for the ChatbotPanel's internal scroll */
+  height: 550px; /* Increased height */
+  min-height: 550px; /* Increased min-height */
+  max-height: 550px;
+  width: 100%;
 `;
 
 
@@ -319,8 +286,8 @@ const StatusBanner = styled(motion.div)`
   position: fixed;
   top: ${props => props.theme.spacing.lg};
   right: ${props => props.theme.spacing.lg};
-  background: ${props => props.connected ? 
-    'linear-gradient(135deg, #4ecdc4, #44a08d)' : 
+  background: ${props => props.connected ?
+    'linear-gradient(135deg, #4ecdc4, #44a08d)' :
     'linear-gradient(135deg, #e74c3c, #c0392b)'};
   color: white;
   padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
@@ -424,6 +391,30 @@ const QuickActionsPanel = styled.div`
   }
 `;
 
+const PanelHeaderTitle = styled(motion.div)`
+  text-align: center;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: ${props => props.theme.borderRadius.lg};
+  padding: ${props => props.theme.spacing.lg};
+  border: 1px solid ${props => props.theme.colors.border};
+  margin-bottom: ${props => props.theme.spacing.md};
+  margin-top: ${props => props.theme.spacing.xxl}; /* Pushes the title down */
+  
+  h1 {
+    font-size: 1.8rem; /* Adjusted size for panel */
+    margin-bottom: ${props => props.theme.spacing.xs};
+    background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .subtitle {
+    font-size: 0.9rem; /* Adjusted size for panel */
+    opacity: 0.8;
+  }
+`;
+
 const App = () => {
   // UI State
   const [backendConnected, setBackendConnected] = useState(false);
@@ -432,7 +423,7 @@ const App = () => {
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   const [currentLayout, setCurrentLayout] = useState('fcose');
   const [selectedNodeDetails, setSelectedNodeDetails] = useState(null);
-  
+
   // Store State
   const {
     graphData,
@@ -454,7 +445,7 @@ const App = () => {
     loadTrending,
     loadRecommendations
   } = useKnowledgeStore();
-  
+
   const analytics = useGraphAnalytics();
 
   // Keyboard shortcuts
@@ -493,15 +484,15 @@ const App = () => {
   useEffect(() => {
     const initializeApp = async () => {
       console.log('🚀 Initializing MindCanvas App...');
-      
+
       try {
         // Check backend health first
         const isHealthy = await checkBackendHealth();
         setBackendConnected(isHealthy);
-        
+
         if (isHealthy) {
           console.log('✅ Backend is healthy, loading all data...');
-          
+
           // Load all data in parallel
           await Promise.allSettled([
             refreshAllData(),
@@ -510,7 +501,7 @@ const App = () => {
             loadTrending(),
             loadRecommendations()
           ]);
-          
+
           console.log('✅ App initialization complete');
         } else {
           console.log('❌ Backend is not available');
@@ -633,16 +624,6 @@ const App = () => {
     <ThemeProvider theme={theme}>
       <GlobalStyle />
       <AppContainer>
-        {/* Header */}
-        <Header
-          initial={{ opacity: 0, y: -50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <h1>🧠 MindCanvas</h1>
-          <div className="subtitle">AI-Powered Knowledge Graph</div>
-        </Header>
-
         {/* Status Banner */}
         <StatusBanner
           connected={backendConnected}
@@ -667,7 +648,7 @@ const App = () => {
             data={overviewStats}
             stats={stats}
           />
-          
+
           <StatisticsPanel
             title="🎯 Content Types"
             type="contentTypes"
@@ -726,7 +707,7 @@ const App = () => {
                   "Please start the backend server to begin using MindCanvas. Check the README for setup instructions."
                 )}
               </div>
-              
+
               {backendConnected && (!graphData.nodes || graphData.nodes.length === 0) && (
                 <Button
                   whileHover={{ scale: 1.05 }}
@@ -761,12 +742,15 @@ const App = () => {
           transition={{ duration: 0.5, delay: 0.3 }}
           style={{ gridArea: 'right-panel' }}
         >
-          <StatisticsPanel
-            title="📈 Graph Analytics"
-            type="graphAnalytics" // Or a more generic type if preferred
-            data={analytics} // Pass raw analytics data
-          />
-
+          {/* Moved Title Header to Right Panel */}
+          <PanelHeaderTitle
+            initial={{ opacity: 0, y: -30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.35 }}
+          >
+            <h1>🧠 MindCanvas</h1>
+            <div className="subtitle">AI-Powered Knowledge Graph</div>
+          </PanelHeaderTitle>
           {recommendationsData.length > 0 && (
             <StatisticsPanel
               title="💡 Recommendations"
@@ -774,16 +758,23 @@ const App = () => {
               data={recommendationsData}
             />
           )}
+          <ChatbotArea
+            initial={{ y: 50, opacity: 0 }} /* Adjusted animation for panel context */
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.45 }}
+          >
+            <ChatbotPanel graphData={graphData} />
+          </ChatbotArea>
         </SidePanel>
 
         {/* Chatbot Area - Fixed positioning */}
-        <ChatbotArea
+        {/* <ChatbotArea
           initial={{ y: 200, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.4 }}
         >
           <ChatbotPanel graphData={graphData} />
-        </ChatbotArea>
+        </ChatbotArea> */}
 
         {/* Modals and Overlays */}
         <AnimatePresence>
@@ -833,7 +824,7 @@ const App = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 50 }}
             >
-              <button 
+              <button
                 className="error-dismiss"
                 onClick={clearError}
                 aria-label="Dismiss error"

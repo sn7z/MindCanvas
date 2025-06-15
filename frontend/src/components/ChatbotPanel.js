@@ -598,7 +598,7 @@ const ChatbotPanel = ({ graphData }) => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            {suggestions.map((suggestion, index) => (
+            {suggestions.slice(0, 3).map((suggestion, index) => (
               <SuggestionChip
                 key={index}
                 whileHover={{ scale: 1.05 }}
