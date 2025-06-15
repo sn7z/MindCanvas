@@ -1,167 +1,184 @@
-# 🧠 MindCanvas - Simple AI Knowledge Graph
+# MindCanvas - AI Knowledge Graph
 
-Turn your browsing history into smart, searchable knowledge with vector embeddings.
+Transform your browsing history into an intelligent, searchable knowledge network. MindCanvas uses AI to analyze your web content, extract relationships, and create an interactive knowledge graph you can explore and query.
 
-## ⚡ Quick Start
+## Features
 
-### 1. Install Dependencies
+- **AI Content Analysis**: Extracts topics, summaries, and quality scores using GPT-4/Groq
+- **Knowledge Graph**: Interactive visualization with multiple layout algorithms
+- **Semantic Search**: Find content by meaning using vector embeddings
+- **RAG Chatbot**: Ask questions about your knowledge in natural language
+- **Chrome Extension**: One-click history export and processing
 
-```bash
+## Requirements
+
+- Python 3.8+
+- Node.js 16+
+- Chrome browser
+- OpenAI API key (required)
+- Groq API key (optional)
+
+## Installation (Windows)
+
+### 1. Clone Repository
+
+```cmd
+git clone https://github.com/yourusername/mindcanvas.git
+cd mindcanvas
+```
+
+### 2. Backend Setup
+
+```cmd
+cd backend
 pip install -r requirements.txt
 ```
 
-### 2. Get API Keys (Free)
-
-- **Groq**: [console.groq.com](https://console.groq.com) (fast, free)
-- **OpenAI**: [platform.openai.com](https://platform.openai.com) (backup)
-
-### 3. Set Environment Variables
-
-Create `.env` file:
+Create `.env` file in `backend` folder:
 
 ```env
-GROQ_API_KEY=your_groq_key_here
-OPENAI_API_KEY=your_openai_key_here
+OPENAI_API_KEY=your_openai_api_key_here
+GROQ_API_KEY=your_groq_api_key_here
 ```
 
-### 4. Run Setup
+Start backend server:
 
-```bash
-python setup.py
-```
-
-### 5. Start Application
-
-```bash
+```cmd
 python main.py
 ```
 
-Open: `http://localhost:8090/static/index.html`
+Backend runs on `http://localhost:8090`
 
-**Note**: Using port 8090 to avoid Windows port conflicts.
+### 3. Frontend Setup
 
-### 6. Install Chrome Extension
+Open new terminal:
 
-1. Chrome → `chrome://extensions/`
-2. Enable "Developer mode"
-3. "Load unpacked" → Select `extension-exporter` folder
-4. Use extension to export history
+```cmd
+cd frontend
+npm install
+npm start
+```
 
-## 🎯 Features
+Frontend runs on `http://localhost:3000`
 
-- **Vector Search**: Find content by meaning, not just keywords
-- **Smart Processing**: Groq Llama + OpenAI dual LLM system
-- **Auto Clustering**: Group similar content automatically
-- **Quality Scoring**: Rate content usefulness 1-10
-- **Trending Topics**: See what you're learning about
-- **Export Data**: Download your knowledge graph
+### 4. Chrome Extension
 
-## 📊 API Endpoints
+1. Open Chrome → `chrome://extensions/`
+2. Enable "Developer mode" (top right)
+3. Click "Load unpacked"
+4. Select the `extension` folder from this project
+5. Pin the extension to toolbar
+
+## Usage
+
+### Export Your History
+
+1. Click the MindCanvas extension icon
+2. Click "Export History (24h)"
+3. Wait for processing to complete
+
+### Explore Your Knowledge
+
+1. Open `http://localhost:3000`
+2. View your knowledge graph
+3. Click nodes to see details
+4. Use search (Ctrl+K) to find content
+5. Chat with AI about your knowledge
+
+### Search & Discovery
+
+- **Semantic Search**: "machine learning concepts"
+- **Text Search**: "React hooks"
+- **Chat Queries**: "What have I learned about Python?"
+
+## API Endpoints
 
 - `POST /api/ingest` - Process browser history
+- `POST /api/chat` - Chat with knowledge base
+- `GET /api/content` - Get processed content
 - `POST /api/search/semantic` - Vector search
-- `GET /api/content` - Get all content
-- `GET /api/trending` - Trending topics
-- `GET /api/analytics` - Learning analytics
+- `GET /api/knowledge-graph/export` - Export graph data
 
-## 🛠️ Simple Architecture
+## Database Setup (Optional)
 
-```
-Chrome Extension → FastAPI Backend → Supabase Database
-     ↓                    ↓                  ↓
-History URLs → Content Extraction → Vector Storage
-     ↓                    ↓                  ↓
-LLM Processing → Semantic Search → Knowledge Graph
-```
+For production, set up Supabase:
 
-## 💾 Database
+1. Create Supabase project
+2. Enable pgvector extension
+3. Run SQL from `backend/supabase_db.py`
+4. Update connection string in code
 
-Uses Supabase (PostgreSQL + pgvector) for:
+Default: Uses file-based storage
 
-- Content storage with metadata
-- Vector embeddings (384 dimensions)
-- Similarity search
-- Analytics tracking
+## Configuration
 
-## 🚨 Troubleshooting
+Edit `backend/main.py`:
 
-**No results in search?**
+- `MAX_CONTENT_LENGTH`: Content truncation limit
+- `BATCH_SIZE`: Processing batch size
+- `EXCLUDED_DOMAINS`: Domains to ignore
 
-- Export more content via Chrome extension
-- Check that API keys are set correctly
+Edit `frontend/src/App.js`:
 
-**Extension not working?**
+- Theme colors and layout options
+- Graph visualization settings
 
-- Make sure backend is running on port 8090
+## Troubleshooting
+
+**Backend won't start:**
+
+- Check Python version: `python --version`
+- Install dependencies: `pip install -r requirements.txt`
+- Verify API keys in `.env` file
+
+**Frontend errors:**
+
+- Check Node version: `node --version`
+- Clear cache: `npm cache clean --force`
+- Reinstall: `rmdir /s node_modules && npm install`
+
+**Extension not working:**
+
+- Check extension is enabled in Chrome
+- Verify backend is running on port 8090
 - Check browser console for errors
 
-**Database errors?**
+**No graph data:**
 
-- Database auto-creates tables as needed
-- Restart application if issues persist
+- Export history using Chrome extension first
+- Check backend logs for processing errors
+- Verify API keys are working
 
-## 🔧 Configuration
+## Development
 
-Edit `main.py` for settings:
+### Add New Content Types
 
-```python
-BATCH_SIZE = 10              # URLs processed at once
-MAX_CONTENT_LENGTH = 1500    # Max text length
-MIN_CONTENT_LENGTH = 30      # Min text length
-```
+1. Update content type detection in `backend/main.py`
+2. Add colors in `frontend/src/components/KnowledgeGraphViewer.js`
+3. Update clustering logic if needed
 
-Edit `supabase_db.py` for vector settings:
+### Customize AI Processing
 
-```python
-# Embedding model (384 dimensions, fast)
-SentenceTransformer('all-MiniLM-L6-v2')
-```
+1. Modify prompts in `backend/main.py`
+2. Adjust quality scoring algorithm
+3. Add new LLM providers in processing pipeline
 
-## 📈 Usage Tips
+### Extend Graph Features
 
-1. **Export regularly** - Use Chrome extension daily
-2. **Quality content** - Focus on educational/reference sites
-3. **Use semantic search** - Try "machine learning concepts" vs exact phrases
-4. **Check trending** - See what topics you're exploring
-5. **Export data** - Backup your knowledge graph
+1. Add new layout algorithms in `frontend/src/components/ControlPanel.js`
+2. Implement custom node rendering
+3. Add new interaction modes
 
-## 🎮 Demo Flow
-
-1. Install extension and export 20-50 URLs
-2. Wait for processing (watch logs)
-3. Try semantic search: "python tutorials"
-4. Browse clusters and trending topics
-5. Export your knowledge graph
-
-## 📁 Project Structure
+## Architecture
 
 ```
-mindcanvas/
-├── main.py              # FastAPI backend
-├── supabase_db.py       # Vector database
-├── requirements.txt     # Dependencies
-├── setup.py            # Database setup
-├── .env                # API keys
-├── static/
-│   └── index.html      # Dashboard
-└── extension-exporter/  # Chrome extension
-    ├── manifest.json
-    ├── background.js
-    ├── popup.html
-    └── popup.js
+┌─ Chrome Extension ─┐    ┌─ FastAPI Backend ─┐    ┌─ React Frontend ─┐
+│ • History Export   │───▶│ • AI Processing   │───▶│ • Graph Viz      │
+│ • Privacy-First    │    │ • Vector DB       │    │ • Search/Chat    │
+└────────────────────┘    │ • RAG System     │    │ • Analytics      │
+                          └───────────────────┘    └──────────────────┘
 ```
 
-## 🚀 Production Deploy
+## License
 
-For production use:
-
-1. Use proper environment variables
-2. Add authentication middleware
-3. Configure CORS properly
-4. Use production Supabase plan
-5. Add rate limiting
-6. Enable HTTPS
-
----
-
-**Simple, working, and powerful. Start building your AI knowledge graph today!**
+MIT License - see LICENSE file for details.
