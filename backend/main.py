@@ -840,6 +840,7 @@ async def health_check():
             "timestamp": datetime.now().isoformat()
         }
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Mount static files for frontend
 try:
     app.mount("/static", StaticFiles(directory="frontend/build"), name="static")
