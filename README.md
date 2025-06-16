@@ -11,6 +11,8 @@ In our information-rich digital age, we consume vast amounts of content daily th
 - Leverage AI to understand and connect your personal knowledge
 
 MindCanvas solves this by transforming your browsing data into an intelligent, searchable knowledge network powered by AI.
+=======
+MindCanvas solves this by transforming your data into an intelligent, searchable knowledge network powered by AI.
 
 ## ✨ Features
 
@@ -32,6 +34,18 @@ MindCanvas solves this by transforming your browsing data into an intelligent, s
 
 ![bg5](https://github.com/user-attachments/assets/74d70fca-4fd0-4a69-b25f-556361c02d4b)
 
+=======
+## Preview
+
+![hp1](https://github.com/user-attachments/assets/74b813d9-681e-424d-b0c4-78eba019f4e8)
+
+![hp2](https://github.com/user-attachments/assets/f00db503-d6ee-4828-8ce2-e7d42d707a69)
+
+![hp3](https://github.com/user-attachments/assets/d93b3f21-30f6-4a8f-86ac-77fd38391946)
+
+![hp4](https://github.com/user-attachments/assets/22885336-8730-4cd3-aa86-1765be12320d)
+
+![bg5](https://github.com/user-attachments/assets/91a6d30a-56a8-4b82-876e-ce0225dcc209)
 
 
 ## 🏗️ Architecture
@@ -123,6 +137,7 @@ Frontend runs on `http://localhost:3000`
 
 1. Click the MindCanvas extension icon
 2. Click "Export data (24h)"
+2. Click "Export Data (24h)"
 3. Wait for processing to complete
 
 ### Explore Your Knowledge
