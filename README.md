@@ -18,7 +18,7 @@ MindCanvas solves this by transforming your browsing data into an intelligent, s
 - **Knowledge Graph**: Interactive visualization with multiple layout algorithms
 - **Semantic Search**: Find content by meaning using vector embeddings
 - **RAG Chatbot**: Ask questions about your knowledge in natural language
-- **Chrome Extension**: One-click data export and processing
+- **Chrome Extension**: One-click data export and processing to Supabase
 
 ## Preview:
   
