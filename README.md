@@ -20,11 +20,18 @@ MindCanvas solves this by transforming your browsing history into an intelligent
 - **RAG Chatbot**: Ask questions about your knowledge in natural language
 - **Chrome Extension**: One-click history export and processing
 
-![Screenshot 2025-06-15 161810](https://github.com/user-attachments/assets/caa5c41a-64b6-4cf8-9403-c99c79f8e06f)
+## Preview
 
-![Screenshot 2025-06-15 161905](https://github.com/user-attachments/assets/c49dd078-de26-4bf1-b72d-b0167caf73f2)
+![hp1](https://github.com/user-attachments/assets/74b813d9-681e-424d-b0c4-78eba019f4e8)
 
-![Screenshot 2025-06-15 161836](https://github.com/user-attachments/assets/185fbfbb-2a68-4826-b3c5-e176a356b783)
+![hp2](https://github.com/user-attachments/assets/f00db503-d6ee-4828-8ce2-e7d42d707a69)
+
+![hp3](https://github.com/user-attachments/assets/d93b3f21-30f6-4a8f-86ac-77fd38391946)
+
+![hp4](https://github.com/user-attachments/assets/22885336-8730-4cd3-aa86-1765be12320d)
+
+![bg5](https://github.com/user-attachments/assets/91a6d30a-56a8-4b82-876e-ce0225dcc209)
+
 
 ## 🏗️ Architecture
 
