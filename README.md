@@ -1,6 +1,6 @@
 # MindCanvas - AI Knowledge Graph
 
-Transform your browsing history into an intelligent, searchable knowledge network. MindCanvas uses AI to analyze your web content, extract relationships, and create an interactive knowledge graph you can explore and query.
+Transform your browsing data into an intelligent, searchable knowledge network. MindCanvas uses AI to analyze your web content, extract relationships, and create an interactive knowledge graph you can explore and query.
 
 ## 🎯 Problem Statement
 
@@ -10,7 +10,7 @@ In our information-rich digital age, we consume vast amounts of content daily th
 - Identify knowledge gaps in your learning journey
 - Leverage AI to understand and connect your personal knowledge
 
-MindCanvas solves this by transforming your browsing history into an intelligent, searchable knowledge network powered by AI.
+MindCanvas solves this by transforming your browsing data into an intelligent, searchable knowledge network powered by AI.
 
 ## ✨ Features
 
@@ -18,7 +18,7 @@ MindCanvas solves this by transforming your browsing history into an intelligent
 - **Knowledge Graph**: Interactive visualization with multiple layout algorithms
 - **Semantic Search**: Find content by meaning using vector embeddings
 - **RAG Chatbot**: Ask questions about your knowledge in natural language
-- **Chrome Extension**: One-click history export and processing
+- **Chrome Extension**: One-click data export and processing
 
 ## Preview:
   
@@ -51,7 +51,7 @@ MindCanvas solves this by transforming your browsing history into an intelligent
 ### Browser Extension
 - **Manifest V3**: Modern Chrome extension
 - **Privacy-First**: All data processing happens locally
-- **Batch Processing**: Efficient history export and processing
+- **Batch Processing**: Efficient data export and processing
 
 ### Processing Pipeline
 ```
@@ -119,10 +119,10 @@ Frontend runs on `http://localhost:3000`
 
 ## 💡 Usage
 
-### Export Your History
+### Export Your data
 
 1. Click the MindCanvas extension icon
-2. Click "Export History (24h)"
+2. Click "Export data (24h)"
 3. Wait for processing to complete
 
 ### Explore Your Knowledge
@@ -178,12 +178,12 @@ Frontend runs on `http://localhost:3000`
 
 ### Privacy & Security
 - **Local Processing**: All analysis happens on your machine
-- **No Data Sharing**: Your browsing history stays private
+- **No Data Sharing**: Your browsing data stays private
 - **Open Source**: Full transparency and customization
 
 ## 🔗 API Endpoints
 
-- `POST /api/ingest` - Process browser history
+- `POST /api/ingest` - Process browser data
 - `POST /api/chat` - Chat with knowledge base
 - `GET /api/content` - Get processed content
 - `POST /api/search/semantic` - Vector search
@@ -251,7 +251,7 @@ Default: Uses file-based storage
 - Check browser console for errors
 
 **No graph data:**
-- Export history using Chrome extension first
+- Export data using Chrome extension first
 - Check backend logs for processing errors
 - Verify API keys are working
 
