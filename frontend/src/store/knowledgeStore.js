@@ -1,4 +1,4 @@
-// src/store/knowledgeStore.js - Error-free implementation with full API integration
+// src/store/knowledgeStore.js - Simplified with backend-controlled filters
 import { create } from 'zustand';
 
 const API_BASE = 'http://localhost:8090/api';
@@ -38,25 +38,20 @@ const apiCall = async (endpoint, options = {}) => {
   }
 };
 
-// Default graph settings
+// Simplified graph settings - only essential cluster-based options
 const defaultGraphSettings = {
   layout: 'fcose',
   showLabels: true,
   clustering: true,
-  physics: true,
-  nodeSize: 'quality',
-  edgeStyle: 'curved',
-  viewMode: 'graph',
-  colorScheme: 'type'
+  physics: true
 };
 
-// Default filter options
-const defaultFilterOptions = {
-  qualityRange: [1, 10],
-  contentTypes: [],
-  dateRange: null,
-  showOnlyConnected: false,
-  minSimilarity: 0.1
+// Simplified user preferences
+const defaultUserPreferences = {
+  autoRefresh: true,
+  refreshInterval: 300000, // 5 minutes
+  enableNotifications: true,
+  compactMode: false
 };
 
 export const useKnowledgeStore = create((set, get) => ({
@@ -89,15 +84,9 @@ export const useKnowledgeStore = create((set, get) => ({
   lastUpdate: null,
   backendHealth: 'unknown',
 
-  // Settings and preferences
+  // Simplified settings and preferences
   graphSettings: defaultGraphSettings,
-  filterOptions: defaultFilterOptions,
-  userPreferences: {
-    autoRefresh: true,
-    refreshInterval: 300000, // 5 minutes
-    enableNotifications: true,
-    compactMode: false
-  },
+  userPreferences: defaultUserPreferences,
 
   // ==================== BASIC ACTIONS ====================
   setSelectedNode: (node) => {
@@ -121,13 +110,6 @@ export const useKnowledgeStore = create((set, get) => ({
     const updatedSettings = { ...currentSettings, ...newSettings };
     console.log('⚙️ Updating graph settings:', newSettings);
     set({ graphSettings: updatedSettings });
-  },
-
-  updateFilterOptions: (newFilters) => {
-    const currentFilters = get().filterOptions;
-    const updatedFilters = { ...currentFilters, ...newFilters };
-    console.log('🔽 Updating filter options:', newFilters);
-    set({ filterOptions: updatedFilters });
   },
 
   // ==================== BACKEND HEALTH ====================
@@ -217,7 +199,7 @@ export const useKnowledgeStore = create((set, get) => ({
         edges: data.edges?.length || 0
       });
       
-      // Process and enhance the graph data
+      // Process and enhance the graph data with cluster-focused optimization
       const processedData = {
         nodes: (data.nodes || []).map(node => ({
           id: node.id?.toString(),
@@ -375,7 +357,8 @@ export const useKnowledgeStore = create((set, get) => ({
         body: JSON.stringify({
           query,
           limit,
-          min_similarity: get().filterOptions.minSimilarity
+          // Backend controls filtering parameters
+          min_similarity: 0.3
         })
       });
       
@@ -513,7 +496,7 @@ export const useKnowledgeStore = create((set, get) => ({
   exportKnowledgeGraph: async (format = 'json') => {
     try {
       console.log('💾 Exporting knowledge graph as:', format);
-      const response = await apiCall(`/export/formats?format_type=${format}&include_embeddings=false&include_content=true`);
+      const response = await apiCall(`/knowledge-graph/export`);
       
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `mindcanvas-knowledge-graph-${timestamp}.${format}`;
@@ -524,19 +507,6 @@ export const useKnowledgeStore = create((set, get) => ({
       if (format === 'json') {
         dataStr = JSON.stringify(response, null, 2);
         mimeType = 'application/json';
-      } else if (format === 'csv') {
-        // Convert CSV data to actual CSV string
-        const csvData = response.data || [];
-        if (csvData.length > 0) {
-          const headers = Object.keys(csvData[0]).join(',');
-          const rows = csvData.map(row => Object.values(row).map(val => 
-            typeof val === 'string' && val.includes(',') ? `"${val}"` : val
-          ).join(','));
-          dataStr = [headers, ...rows].join('\n');
-          mimeType = 'text/csv';
-        } else {
-          throw new Error('No CSV data to export');
-        }
       } else {
         dataStr = JSON.stringify(response, null, 2);
         mimeType = 'application/json';
@@ -591,7 +561,7 @@ export const useKnowledgeStore = create((set, get) => ({
       lastUpdate: null,
       backendHealth: 'unknown',
       graphSettings: defaultGraphSettings,
-      filterOptions: defaultFilterOptions
+      userPreferences: defaultUserPreferences
     });
   },
 

@@ -1,4 +1,4 @@
-// src/components/SearchOverlay.js
+// src/components/SearchOverlay.js - Simplified with backend-controlled filtering
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -125,19 +125,6 @@ const FilterSelect = styled.select`
   option {
     background: #1a1a2e;
     color: white;
-  }
-`;
-
-const FilterCheckbox = styled.label`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.sm};
-  cursor: pointer;
-  font-size: 0.9rem;
-  color: ${props => props.theme.colors.textSecondary};
-  
-  input[type="checkbox"] {
-    accent-color: ${props => props.theme.colors.primary};
   }
 `;
 
@@ -293,9 +280,6 @@ const SearchOverlay = ({ onClose, onSearch, graphData }) => {
   const [results, setResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchType, setSearchType] = useState('semantic');
-  const [contentTypeFilter, setContentTypeFilter] = useState('all');
-  const [qualityFilter, setQualityFilter] = useState('all');
-  const [showConnectedOnly, setShowConnectedOnly] = useState(false);
   
   const inputRef = useRef(null);
   const { performSemanticSearch, performTextSearch } = useKnowledgeStore();
@@ -340,7 +324,7 @@ const SearchOverlay = ({ onClose, onSearch, graphData }) => {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [query, searchType, contentTypeFilter, qualityFilter, showConnectedOnly]);
+  }, [query, searchType]);
 
   const performSearch = async (searchQuery) => {
     if (!searchQuery.trim()) return;
@@ -359,41 +343,14 @@ const SearchOverlay = ({ onClose, onSearch, graphData }) => {
           matches: result.matches
         }));
       } else if (searchType === 'semantic') {
-        // Semantic search via API
+        // Semantic search via API (backend handles filtering)
         searchResults = await performSemanticSearch(searchQuery, 20);
       } else {
-        // Text search via API
+        // Text search via API (backend handles filtering)
         searchResults = await performTextSearch(searchQuery, 20);
       }
       
-      // Apply filters
-      let filteredResults = searchResults;
-      
-      if (contentTypeFilter !== 'all') {
-        filteredResults = filteredResults.filter(item => 
-          (item.content_type || item.type) === contentTypeFilter
-        );
-      }
-      
-      if (qualityFilter !== 'all') {
-        const minQuality = parseInt(qualityFilter);
-        filteredResults = filteredResults.filter(item => 
-          (item.quality_score || item.quality || 0) >= minQuality
-        );
-      }
-      
-      if (showConnectedOnly && graphData?.links) {
-        const connectedNodeIds = new Set();
-        graphData.links.forEach(link => {
-          connectedNodeIds.add(link.source);
-          connectedNodeIds.add(link.target);
-        });
-        filteredResults = filteredResults.filter(item => 
-          connectedNodeIds.has(item.id)
-        );
-      }
-      
-      setResults(filteredResults);
+      setResults(searchResults);
     } catch (error) {
       console.error('Search failed:', error);
       setResults([]);
@@ -422,12 +379,6 @@ const SearchOverlay = ({ onClose, onSearch, graphData }) => {
 
   const handleQuickSearch = (quickQuery) => {
     setQuery(quickQuery);
-  };
-
-  const getContentTypes = () => {
-    if (!graphData?.nodes) return [];
-    const types = new Set(graphData.nodes.map(node => node.type || node.content_type).filter(Boolean));
-    return Array.from(types);
   };
 
   const getResultColor = (contentType) => {
@@ -492,41 +443,6 @@ const SearchOverlay = ({ onClose, onSearch, graphData }) => {
                 <option value="local">⚡ Local</option>
               </FilterSelect>
             </FilterGroup>
-
-            <FilterGroup>
-              <label>Content Type:</label>
-              <FilterSelect
-                value={contentTypeFilter}
-                onChange={(e) => setContentTypeFilter(e.target.value)}
-              >
-                <option value="all">All Types</option>
-                {getContentTypes().map(type => (
-                  <option key={type} value={type}>{type}</option>
-                ))}
-              </FilterSelect>
-            </FilterGroup>
-
-            <FilterGroup>
-              <label>Min Quality:</label>
-              <FilterSelect
-                value={qualityFilter}
-                onChange={(e) => setQualityFilter(e.target.value)}
-              >
-                <option value="all">Any Quality</option>
-                <option value="7">7+ High</option>
-                <option value="8">8+ Excellent</option>
-                <option value="9">9+ Premium</option>
-              </FilterSelect>
-            </FilterGroup>
-
-            <FilterCheckbox>
-              <input
-                type="checkbox"
-                checked={showConnectedOnly}
-                onChange={(e) => setShowConnectedOnly(e.target.checked)}
-              />
-              Connected nodes only
-            </FilterCheckbox>
           </SearchFilters>
 
           <SearchStats>
@@ -553,7 +469,7 @@ const SearchOverlay = ({ onClose, onSearch, graphData }) => {
               <div className="empty-icon">🔍</div>
               <div className="empty-title">No results found</div>
               <div className="empty-description">
-                Try adjusting your search terms or filters.<br />
+                Try adjusting your search terms.<br />
                 Use semantic search for concept-based queries.
               </div>
             </EmptyState>

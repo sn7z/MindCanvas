@@ -1,4 +1,4 @@
-// src/components/ControlPanel.js
+// src/components/ControlPanel.js - Simplified with only essential controls
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -113,14 +113,6 @@ const DropdownItem = styled.div`
   }
 `;
 
-const DropdownSection = styled.div`
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
 const DropdownHeader = styled.div`
   padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.lg};
   font-size: 0.8rem;
@@ -174,106 +166,27 @@ const ControlPanel = ({
   isRefreshing 
 }) => {
   const [showLayoutMenu, setShowLayoutMenu] = useState(false);
-  const [showViewMenu, setShowViewMenu] = useState(false);
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [hoveredButton, setHoveredButton] = useState(null);
   
   const { 
-    graphSettings, 
     updateGraphSettings, 
     refreshAllData,
-    exportKnowledgeGraph,
-    filterOptions,
-    updateFilterOptions
+    exportKnowledgeGraph
   } = useKnowledgeStore();
 
+  // Simplified layout options - only cluster-based layouts
   const layoutOptions = [
     {
       id: 'fcose',
-      name: 'Force-Directed',
+      name: 'Force-Directed Clustering',
       icon: '🌐',
-      description: 'Physics-based layout with clustering'
+      description: 'Physics-based layout with smart clustering'
     },
     {
       id: 'cola',
-      name: 'Constraint-Based',
+      name: 'Constraint-Based Clustering',
       icon: '🎯',
-      description: 'Organized layout with constraints'
-    },
-    {
-      id: 'dagre',
-      name: 'Hierarchical',
-      icon: '🌳',
-      description: 'Tree-like hierarchical structure'
-    },
-    {
-      id: 'elk',
-      name: 'Layered',
-      icon: '📊',
-      description: 'Layered directed graph'
-    },
-    {
-      id: 'circle',
-      name: 'Circular',
-      icon: '⭕',
-      description: 'Nodes arranged in a circle'
-    },
-    {
-      id: 'grid',
-      name: 'Grid',
-      icon: '⬜',
-      description: 'Regular grid arrangement'
-    }
-  ];
-
-  const viewOptions = [
-    {
-      id: 'graph',
-      name: 'Graph View',
-      icon: '🕸️',
-      description: 'Interactive node-link diagram'
-    },
-    {
-      id: 'cluster',
-      name: 'Cluster View',
-      icon: '🎯',
-      description: 'Grouped by content clusters'
-    },
-    {
-      id: 'timeline',
-      name: 'Timeline View',
-      icon: '📅',
-      description: 'Chronological arrangement'
-    }
-  ];
-
-  const filterOptions_config = [
-    {
-      id: 'quality',
-      name: 'High Quality Only',
-      icon: '⭐',
-      active: filterOptions.qualityRange[0] > 7,
-      action: () => updateFilterOptions({
-        qualityRange: filterOptions.qualityRange[0] > 7 ? [1, 10] : [8, 10]
-      })
-    },
-    {
-      id: 'connected',
-      name: 'Connected Nodes',
-      icon: '🔗',
-      active: filterOptions.showOnlyConnected,
-      action: () => updateFilterOptions({
-        showOnlyConnected: !filterOptions.showOnlyConnected
-      })
-    },
-    {
-      id: 'recent',
-      name: 'Recent Content',
-      icon: '🕒',
-      active: filterOptions.dateRange !== null,
-      action: () => updateFilterOptions({
-        dateRange: filterOptions.dateRange ? null : 'week'
-      })
+      description: 'Organized clusters with constraints'
     }
   ];
 
@@ -281,11 +194,6 @@ const ControlPanel = ({
     onLayoutChange(layoutId);
     updateGraphSettings({ layout: layoutId });
     setShowLayoutMenu(false);
-  };
-
-  const handleViewSelect = (viewId) => {
-    updateGraphSettings({ viewMode: viewId });
-    setShowViewMenu(false);
   };
 
   const handleRefresh = async () => {
@@ -303,12 +211,6 @@ const ControlPanel = ({
     } catch (error) {
       console.error('Export failed:', error);
     }
-  };
-
-  const toggleGraphSetting = (setting) => {
-    updateGraphSettings({
-      [setting]: !graphSettings[setting]
-    });
   };
 
   return (
@@ -368,7 +270,7 @@ const ControlPanel = ({
               exit={{ opacity: 0, y: -10, scale: 0.95 }}
               transition={{ duration: 0.15 }}
             >
-              <DropdownHeader>Layout Algorithms</DropdownHeader>
+              <DropdownHeader>Cluster Layouts</DropdownHeader>
               {layoutOptions.map((layout) => (
                 <DropdownItem
                   key={layout.id}
@@ -382,132 +284,6 @@ const ControlPanel = ({
                   </div>
                 </DropdownItem>
               ))}
-            </DropdownMenu>
-          )}
-        </AnimatePresence>
-      </DropdownContainer>
-
-      {/* View Mode Selector */}
-      <DropdownContainer>
-        <DropdownButton
-          className={showViewMenu ? 'open' : ''}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setShowViewMenu(!showViewMenu)}
-          onMouseEnter={() => setHoveredButton('view')}
-          onMouseLeave={() => setHoveredButton(null)}
-        >
-          👁️
-        </DropdownButton>
-
-        <AnimatePresence>
-          {hoveredButton === 'view' && !showViewMenu && (
-            <Tooltip
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 5 }}
-            >
-              Change View Mode
-            </Tooltip>
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {showViewMenu && (
-            <DropdownMenu
-              initial={{ opacity: 0, y: -10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            >
-              <DropdownHeader>View Modes</DropdownHeader>
-              {viewOptions.map((view) => (
-                <DropdownItem
-                  key={view.id}
-                  className={graphSettings.viewMode === view.id ? 'active' : ''}
-                  onClick={() => handleViewSelect(view.id)}
-                >
-                  <span className="icon">{view.icon}</span>
-                  <div>
-                    <div>{view.name}</div>
-                    <div className="description">{view.description}</div>
-                  </div>
-                </DropdownItem>
-              ))}
-            </DropdownMenu>
-          )}
-        </AnimatePresence>
-      </DropdownContainer>
-
-      {/* Filters */}
-      <DropdownContainer>
-        <DropdownButton
-          className={showFilterMenu ? 'open' : ''}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setShowFilterMenu(!showFilterMenu)}
-          onMouseEnter={() => setHoveredButton('filter')}
-          onMouseLeave={() => setHoveredButton(null)}
-        >
-          🔽
-        </DropdownButton>
-
-        <AnimatePresence>
-          {hoveredButton === 'filter' && !showFilterMenu && (
-            <Tooltip
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 5 }}
-            >
-              Filter Options
-            </Tooltip>
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence>
-          {showFilterMenu && (
-            <DropdownMenu
-              initial={{ opacity: 0, y: -10, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            >
-              <DropdownSection>
-                <DropdownHeader>Content Filters</DropdownHeader>
-                {filterOptions_config.map((filter) => (
-                  <DropdownItem
-                    key={filter.id}
-                    className={filter.active ? 'active' : ''}
-                    onClick={filter.action}
-                  >
-                    <span className="icon">{filter.icon}</span>
-                    <div>{filter.name}</div>
-                  </DropdownItem>
-                ))}
-              </DropdownSection>
-
-              <DropdownSection>
-                <DropdownHeader>Display Settings</DropdownHeader>
-                <DropdownItem
-                  className={graphSettings.showLabels ? 'active' : ''}
-                  onClick={() => toggleGraphSetting('showLabels')}
-                >
-                  <span className="icon">🏷️</span>
-                  <div>Show Labels</div>
-                </DropdownItem>
-                <DropdownItem
-                  className={graphSettings.clustering ? 'active' : ''}
-                  onClick={() => toggleGraphSetting('clustering')}
-                >
-                  <span className="icon">🎯</span>
-                  <div>Enable Clustering</div>
-                </DropdownItem>
-                <DropdownItem
-                  className={graphSettings.physics ? 'active' : ''}
-                  onClick={() => toggleGraphSetting('physics')}
-                >
-                  <span className="icon">⚡</span>
-                  <div>Physics Simulation</div>
-                </DropdownItem>
-              </DropdownSection>
             </DropdownMenu>
           )}
         </AnimatePresence>
