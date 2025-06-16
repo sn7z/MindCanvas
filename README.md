@@ -1,6 +1,6 @@
 # MindCanvas - AI Knowledge Graph
 
-Transform your browsing data into an intelligent, searchable knowledge network. MindCanvas uses AI to analyze your web content, extract relationships, and create an interactive knowledge graph you can explore and query.
+Transform your browsing data into an intelligent, searchable knowledge network. MindCanvas uses AI to analyze your web content, extract relationships, and create an interactive knowledge graph you can explore, search and query.
 
 ## 🎯 Problem Statement
 
